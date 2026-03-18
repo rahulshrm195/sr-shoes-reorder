@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>SR Shoes – Reorder Tool</title>
+<title>SR Shoes – Reorder Tool v2.1.0</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0f172a"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -16,8 +16,18 @@
 <!-- Firebase -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
-import { getFirestore, collection, addDoc, getDocs, orderBy, query } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+import { getFirestore, collection, addDoc, getDocs, orderBy, query, setDoc, doc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 
+const firebaseConfig = {
+  apiKey: "AIzaSyBm7cmZKWBZTUUaof-2vv20E513vH4sRi8",
+  authDomain: "sr-shoes-reorder.firebaseapp.com",
+  projectId: "sr-shoes-reorder",
+  storageBucket: "sr-shoes-reorder.firebasestorage.app",
+  messagingSenderId: "391006243111",
+  appId: "1:391006243111:web:339d212abca423f3a80102"
+};
+
+/*
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
   authDomain: "YOUR_PROJECT.firebaseapp.com",
@@ -26,6 +36,7 @@ const firebaseConfig = {
   messagingSenderId: "YOUR_SENDER_ID",
   appId: "YOUR_APP_ID"
 };
+*/
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -35,6 +46,8 @@ window._fbAddDoc = addDoc;
 window._fbGetDocs = getDocs;
 window._fbOrderBy = orderBy;
 window._fbQuery = query;
+window._fbSetDoc = setDoc;
+window._fbDoc = doc;
 window._firebaseReady = true;
 window.dispatchEvent(new Event('firebaseReady'));
 </script>
@@ -334,6 +347,26 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 @keyframes spin{to{transform:rotate(360deg)}}
 .loader-text{font-family:var(--font-mono);font-size:13px;color:var(--muted)}
 
+
+/* ── Settings ── */
+.brand-setting-row{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 20px;border-bottom:1px solid rgba(51,65,85,.3);
+}
+.brand-setting-row:last-child{border-bottom:none}
+.brand-setting-row:hover{background:rgba(255,255,255,.02)}
+.bsr-name{flex:1;font-size:13px;font-weight:500}
+.bsr-group{font-size:11px;color:var(--muted);font-family:var(--font-mono)}
+.toggle-wrap{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.toggle-btn{
+  border:none;padding:5px 14px;font-size:11px;font-weight:700;
+  font-family:var(--font-mono);cursor:pointer;transition:all .15s;
+}
+.toggle-btn.cutsize{background:transparent;color:var(--muted)}
+.toggle-btn.cutsize.active{background:#4f46e5;color:#fff}
+.toggle-btn.fullset{background:transparent;color:var(--muted)}
+.toggle-btn.fullset.active{background:var(--accent);color:#fff}
+
 @media(max-width:600px){
   .topbar{padding:0 16px}
   .page{padding:16px 16px 60px}
@@ -347,7 +380,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 <div id="loginScreen">
   <div class="login-card">
     <div class="login-logo">SR Shoes</div>
-    <div class="login-sub">Reorder Management Tool</div>
+    <div class="login-sub">Reorder Management Tool <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted2);margin-left:4px">v2.1.0</span></div>
     <label class="login-label">PASSWORD</label>
     <input type="password" class="login-input" id="loginPass" placeholder="Enter password" autocomplete="current-password"/>
     <button class="login-btn" onclick="doLogin()">Access Tool →</button>
@@ -360,11 +393,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   <div class="topbar">
     <div class="topbar-logo">SR Shoes</div>
     <div class="topbar-sep">|</div>
-    <span style="font-size:13px;color:var(--muted);font-family:var(--font-mono)">Reorder Tool</span>
+    <span style="font-size:13px;color:var(--muted);font-family:var(--font-mono)">Reorder Tool <span style="color:var(--accent2);font-size:11px">v2.1.0</span></span>
     <div class="nav-tabs">
       <button class="nav-tab active" onclick="showPage('upload',this)">📤 <span>Upload</span></button>
       <button class="nav-tab" onclick="showPage('history',this)">📁 <span>History</span></button>
       <button class="nav-tab" onclick="showPage('trends',this)">📈 <span>Trends</span></button>
+      <button class="nav-tab" onclick="showPage('settings',this)">⚙️ <span>Settings</span></button>
     </div>
     <button class="logout-btn" onclick="doLogout()">Logout</button>
   </div>
@@ -416,6 +450,29 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   </div>
 </div>
 
+  <!-- Settings Page -->
+  <div class="page" id="page-settings">
+    <div style="max-width:700px;margin:0 auto">
+      <div class="section-title">Supplier Order Type</div>
+      <div style="color:var(--muted);font-size:13px;margin-bottom:20px;line-height:1.6">
+        Set each brand as <strong style="color:#818cf8">CUTSIZE</strong> (supplier ships single sizes — order immediately when any size sells) 
+        or <strong style="color:#f97316">FULL SET</strong> (supplier ships complete sets — only order when all-but-one size from the set is sold).
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <div style="padding:14px 20px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center">
+          <input type="text" id="settingsSearch" placeholder="Search brand..." 
+            style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 12px;color:var(--text);font-family:var(--font-body);font-size:13px;outline:none"
+            oninput="filterSettingsBrands()"/>
+          <button onclick="saveSettings()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 18px;font-family:var(--font-head);font-size:13px;font-weight:700;cursor:pointer">Save Settings</button>
+        </div>
+        <div id="settingsBrandList" style="max-height:520px;overflow-y:auto"></div>
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:var(--muted2);font-family:var(--font-mono)">
+        Settings are saved to Firebase and applied automatically every cycle.
+      </div>
+    </div>
+  </div>
+
 <!-- Modal -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
@@ -431,7 +488,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────
-const PASSWORD = 'srshoes2024';   // ← change this
+const PASSWORD = 'srshoes2026';   // ← change this
 
 // ── BRAND RULES ───────────────────────────────────────────────────────
 const BRAND_RULES = [
@@ -527,9 +584,71 @@ function priority(qty) {
 }
 
 // ── STATE ─────────────────────────────────────────────────────────────
-let parsedData = null;   // current cycle's processed data
+let parsedData = null;
 let currentFile = null;
-let cycles = [];         // loaded from Firebase
+let cycles = [];
+let brandSettings = {};  // brand → 'cutsize' | 'fullset'
+
+// ── SETTINGS ──────────────────────────────────────────────────────────
+async function loadSettings() {
+  if (!window._firebaseReady) { window.addEventListener('firebaseReady',loadSettings,{once:true}); return; }
+  try {
+    const db=window._db;
+    const snap=await window._fbGetDocs(window._fbCollection(db,'srshoes_brand_settings'));
+    snap.forEach(d=>{ brandSettings[d.id]=d.data().orderType||'fullset'; });
+  } catch(e){ console.error('loadSettings:',e); }
+}
+
+async function saveSettings() {
+  if (!window._firebaseReady) { toast('Firebase not ready','error'); return; }
+  const db=window._db;
+  const rows=document.querySelectorAll('.brand-setting-row');
+  let saved=0;
+  for (const row of rows) {
+    const brand=row.dataset.brand;
+    const ot=row.querySelector('.toggle-btn.active.cutsize')?'cutsize':'fullset';
+    brandSettings[brand]=ot;
+    try {
+      // setDoc with brand as doc ID — always overwrites, no duplicates
+      await window._fbSetDoc(
+        window._fbDoc(db,'srshoes_brand_settings', brand),
+        {brand, orderType:ot, updatedAt:new Date().toISOString()}
+      );
+      saved++;
+    } catch(e){ console.error(e); }
+  }
+  toast(`Settings saved for ${saved} brands ✓`,'success');
+}
+
+function renderSettings() {
+  const brands = BRAND_RULES.map(([b])=>b).filter(b=>b!=='Other');
+  const list=document.getElementById('settingsBrandList');
+  list.innerHTML=brands.map(brand=>{
+    const ot=brandSettings[brand]||'fullset';
+    return `<div class="brand-setting-row" data-brand="${brand}">
+      <div class="bsr-name">${brand}</div>
+      <div class="toggle-wrap">
+        <button class="toggle-btn cutsize ${ot==='cutsize'?'active':''}" 
+          onclick="toggleBrandSetting(this,'cutsize')">✂ CUTSIZE</button>
+        <button class="toggle-btn fullset ${ot==='fullset'?'active':''}" 
+          onclick="toggleBrandSetting(this,'fullset')">📦 FULL SET</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleBrandSetting(btn, type) {
+  const wrap=btn.closest('.toggle-wrap');
+  wrap.querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function filterSettingsBrands() {
+  const q=document.getElementById('settingsSearch').value.toLowerCase();
+  document.querySelectorAll('.brand-setting-row').forEach(r=>{
+    r.style.display=r.dataset.brand.toLowerCase().includes(q)?'':'none';
+  });
+}
 
 // ── LOGIN ─────────────────────────────────────────────────────────────
 document.getElementById('loginPass').addEventListener('keyup', e => { if(e.key==='Enter') doLogin(); });
@@ -539,6 +658,7 @@ function doLogin() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     loadCycles();
+    loadSettings();
   } else {
     document.getElementById('loginErr').style.display = 'block';
   }
@@ -557,6 +677,7 @@ function showPage(id, btn) {
   btn.classList.add('active');
   if (id === 'history') renderHistory();
   if (id === 'trends') renderTrends();
+  if (id === 'settings') renderSettings();
 }
 
 // ── DRAG DROP ─────────────────────────────────────────────────────────
@@ -655,7 +776,7 @@ async function processFile() {
   parsedData = {rows, brandTotals, totalQty, totalAmt, totalDisc, skuCount:rows.length};
 
   setProgress(80, 'Generating Excel...');
-  const xlsBlob = await generateExcel(parsedData, document.getElementById('cyclePeriod').value, document.getElementById('cycleType').value);
+  const xlsBlob = await generateExcel(parsedData, document.getElementById('cyclePeriod').value, document.getElementById('cycleType').value, brandSettings);
   setProgress(100, 'Done!');
 
   renderResults(parsedData, xlsBlob);
@@ -669,7 +790,7 @@ function setProgress(pct, msg) {
 }
 
 // ── EXCEL GENERATION ───────────────────────────────────────────────────
-async function generateExcel(data, period, cycleType) {
+async function generateExcel(data, period, cycleType, brandSettings={}) {
   const wb = new ExcelJS.Workbook();
 
   // ── Sheet 1: Brand Reorder ──
@@ -681,47 +802,36 @@ async function generateExcel(data, period, cycleType) {
   const HIGH_FC='C53030', MED_FC='744210', LOW_FC='22543D';
   const ALT='FAF5FF', WHITE='FFFFFF', BRAND_FC='FFFFFF', HDR_FC='FFFFFF';
 
-  // Safe cell writer — no vertical:'middle' (ExcelJS bug), no merge+border conflict
+  // Safe cell writer — fixes ExcelJS vertical:'middle' + merge+border corruption
   function sc(ws, r, c, v, opts={}) {
-    const cell = ws.getCell(r,c);
-    cell.value = v;
-    cell.font = opts.font
-      ? {name:'Arial', size:9, ...opts.font}
-      : {name:'Arial', size:9};
-    if (opts.fill) cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF'+opts.fill}};
-    cell.alignment = {horizontal: opts.align||'left', wrapText:false};
-    if (opts.fmt) cell.numFmt = opts.fmt;
-    if (opts.border) {
-      const s = {style:'thin', color:{argb:'FFDDDDDD'}};
-      cell.border = {left:s, right:s, top:s, bottom:s};
-    }
+    const cl = ws.getCell(r,c);
+    cl.value = v;
+    cl.font = opts.font ? {name:'Arial',size:9,...opts.font} : {name:'Arial',size:9};
+    if (opts.fill) cl.fill = {type:'pattern',pattern:'solid',fgColor:{argb:'FF'+opts.fill}};
+    cl.alignment = {horizontal:opts.align||'left', wrapText:false};
+    if (opts.fmt) cl.numFmt = opts.fmt;
+    if (opts.border){const s={style:'thin',color:{argb:'FFDDDDDD'}};cl.border={left:s,right:s,top:s,bottom:s};}
   }
-
-  // Span a row by filling all cells (avoids mergeCells corruption)
   function spanRow(ws, r, c1, c2, v, opts={}) {
     sc(ws, r, c1, v, opts);
-    for (let c = c1+1; c <= c2; c++) {
-      sc(ws, r, c, '', {fill: opts.fill});
-    }
+    for (let c=c1+1;c<=c2;c++) sc(ws,r,c,'',{fill:opts.fill});
   }
 
   // Title
-  spanRow(ws,1,1,10,`SR Shoes – Brand Reorder  |  ${period}  (${cycleType})`,
+  spanRow(ws,1,1,11,`SR Shoes – Brand Reorder  |  ${period}  (${cycleType})`,
     {font:{bold:true,size:13,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'center'});
   ws.getRow(1).height=28;
-
-  spanRow(ws,2,1,10,`Qty Sold: ${data.totalQty}  |  Revenue: ₹${data.totalAmt.toLocaleString('en-IN',{maximumFractionDigits:0})}  |  Discount: ₹${data.totalDisc.toLocaleString('en-IN',{maximumFractionDigits:0})}  |  Lines: ${data.skuCount}`,
+  spanRow(ws,2,1,11,`Qty Sold: ${data.totalQty}  |  Revenue: ₹${data.totalAmt.toLocaleString('en-IN',{maximumFractionDigits:0})}  |  Discount: ₹${data.totalDisc.toLocaleString('en-IN',{maximumFractionDigits:0})}  |  Lines: ${data.skuCount}`,
     {font:{size:9,color:{argb:'FF553C9A'}},fill:'EDE9FE',align:'center'});
   ws.getRow(2).height=15;
-
-  spanRow(ws,3,1,10,'Priority: HIGH ≥5 pairs  |  MED 3-4 pairs  |  LOW 1-2 pairs',
+  spanRow(ws,3,1,11,'Priority: HIGH ≥5 pairs  |  MED 3-4 pairs  |  LOW 1-2 pairs  |  ✂ CUTSIZE = order any size  |  📦 FULL SET = order when set complete',
     {font:{size:8,italic:true,color:{argb:'FF718096'}},fill:'F7FAFC',align:'center'});
   ws.getRow(3).height=13;
   ws.getRow(4).height=5;
 
-  // Headers — with Color column
-  const HDRS=['#','Brand','Category','Item Name','Color','Sizes','Qty','Brand SKUs','Revenue (₹)','Priority'];
-  const WIDS=[4,16,22,34,18,14,8,10,14,10];
+  // Headers — 11 cols including Order Type
+  const HDRS=['#','Brand','Category','Item Name','Color','Sizes','Qty','Brand SKUs','Revenue (₹)','Priority','Order Type'];
+  const WIDS=[4,16,22,34,18,14,8,10,14,10,14];
   HDRS.forEach((h,i)=>{
     sc(ws,5,i+1,h,{font:{bold:true,size:9,color:{argb:'FF'+HDR_FC}},fill:HDR_BG,align:'center'});
   });
@@ -730,9 +840,9 @@ async function generateExcel(data, period, cycleType) {
 
   let curRow=6, rowNum=0;
   for (const bt of data.brandTotals) {
-    // Brand header row — spanRow instead of merge to avoid corruption
-    spanRow(ws,curRow,1,10,
-      `  ${bt.brand.toUpperCase()}   —   ${bt.totalQty} pairs  |  ${bt.skuCount} SKUs  |  ₹${bt.totalAmt.toLocaleString('en-IN',{maximumFractionDigits:0})}`,
+    // Brand header row — spanRow avoids merge+border corruption
+    const orderTypeLabel = brandSettings[bt.brand]==='cutsize' ? '✂ CUTSIZE' : '📦 FULL SET';
+    spanRow(ws,curRow,1,11,`  ${bt.brand.toUpperCase()}   —   ${bt.totalQty} pairs  |  ${bt.skuCount} SKUs  |  ₹${bt.totalAmt.toLocaleString('en-IN',{maximumFractionDigits:0})}  |  ${orderTypeLabel}`,
       {font:{bold:true,size:9,color:{argb:'FF'+BRAND_FC}},fill:BRAND_BG});
     ws.getRow(curRow).height=18;
     curRow++;
@@ -747,15 +857,20 @@ async function generateExcel(data, period, cycleType) {
       const sizes=[...new Set(item.sizes)].sort().join(', ')||'—';
       const colorVal = item.color || '—';
 
+      // cols: 1=# 2=brand 3=group 4=base 5=color 6=sizes 7=qty 8=skuCount 9=revenue 10=priority 11=orderType
+      const isCutsize = brandSettings[bt.brand]==='cutsize';
+      const orderNote = isCutsize ? '✂ CUTSIZE' : '📦 FULL SET';
+      const orderBG   = isCutsize ? 'EDE9FE' : 'FFF7ED';
+      const orderFC   = isCutsize ? '4338CA' : 'C2410C';
       const rowData=[rowNum,'',item.group,item.base,colorVal,sizes,item.qty,bt.skuCount,
-        Math.round(item.amount*100)/100, pri];
+        Math.round(item.amount*100)/100, pri, orderNote];
       rowData.forEach((v,ci)=>{
         const isAmt=ci===8, isPri=ci===9, isNum=ci===0||ci===6||ci===7;
-        const isColor=ci===4;
+        const isColor=ci===4, isOrder=ci===10;
         sc(ws,r,ci+1,v,{
-          fill: isPri?priBG : isColor&&colorVal!=='—'?'EEF2FF' : bg,
-          font:{bold:isPri,size:9,color:{argb:'FF'+(isPri?priFC:'2D3748')}},
-          align:isPri||isNum?'center':isAmt?'right':'left',
+          fill: isPri?priBG : isOrder?orderBG : isColor&&colorVal!=='—'?'EEF2FF' : bg,
+          font:{bold:isPri||isOrder,size:9,color:{argb:'FF'+(isPri?priFC:isOrder?orderFC:'2D3748')}},
+          align:isPri||isNum||isOrder?'center':isAmt?'right':'left',
           fmt:isAmt?'#,##0.00':null, border:true
         });
       });
@@ -769,50 +884,42 @@ async function generateExcel(data, period, cycleType) {
   }
 
   // Grand total — spanRow
-  spanRow(ws,curRow,1,6,`GRAND TOTAL  —  ${rowNum} lines  |  ${data.brandTotals.length} Brands`,
+  spanRow(ws,curRow,1,11,`GRAND TOTAL  —  ${rowNum} lines  |  ${data.brandTotals.length} Brands`,
     {font:{bold:true,size:9,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'right'});
   sc(ws,curRow,7,data.totalQty,{font:{bold:true,size:10,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'center'});
-  sc(ws,curRow,8,'',{fill:TITLE_BG});
   sc(ws,curRow,9,Math.round(data.totalAmt*100)/100,{font:{bold:true,size:10,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'right',fmt:'#,##0.00'});
-  sc(ws,curRow,10,'',{fill:TITLE_BG});
   ws.getRow(curRow).height=20;
 
   // ── Sheet 2: Brand Summary ──
   const ws2=wb.addWorksheet('Brand Summary');
   ws2.views=[{showGridLines:false,state:'frozen',ySplit:3}];
-  spanRow(ws2,1,1,7,`Brand Performance – ${period}`,
-    {font:{bold:true,size:13,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'center'});
+  spanRow(ws2,1,1,8,`Brand Performance – ${period}`,{font:{bold:true,size:13,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'center'});
   ws2.getRow(1).height=26;
   ws2.getRow(2).height=5;
-  ['#','Brand','Total Qty','SKUs','Revenue (₹)','% Qty','% Rev'].forEach((h,i)=>{
+  ['#','Brand','Total Qty','SKUs','Revenue (₹)','% Qty','% Rev','Order Type'].forEach((h,i)=>{
     sc(ws2,3,i+1,h,{font:{bold:true,size:9,color:{argb:'FF'+HDR_FC}},fill:HDR_BG,align:'center'});
   });
-  [4,20,12,10,16,10,10].forEach((w,i)=>ws2.getColumn(i+1).width=w);
+  [4,20,12,10,16,10,10,14].forEach((w,i)=>ws2.getColumn(i+1).width=w);
   ws2.getRow(3).height=18;
 
   data.brandTotals.forEach((bt,idx)=>{
     const r=idx+4, bg=idx%2===0?ALT:WHITE;
+    const bOT = brandSettings[bt.brand]==='cutsize'?'✂ CUTSIZE':'📦 FULL SET';
+    const bOTbg = brandSettings[bt.brand]==='cutsize'?'EDE9FE':'FFF7ED';
+    const bOTfc = brandSettings[bt.brand]==='cutsize'?'4338CA':'C2410C';
     [idx+1,bt.brand,bt.totalQty,bt.skuCount,
       Math.round(bt.totalAmt*100)/100,
       data.totalQty>0?Math.round(bt.totalQty/data.totalQty*1000)/10:0,
-      data.totalAmt>0?Math.round(bt.totalAmt/data.totalAmt*1000)/10:0
+      data.totalAmt>0?Math.round(bt.totalAmt/data.totalAmt*1000)/10:0,
+      bOT
     ].forEach((v,ci)=>{
-      sc(ws2,r,ci+1,v,{fill:bg,font:{size:9,color:{argb:'FF2D3748'}},
-        align:[0,2,3,5,6].includes(ci)?'center':ci===4?'right':'left',
-        fmt:ci===4?'#,##0.00':ci>=5?'0.0"%"':null,border:true});
+      const isOT=ci===7;
+      sc(ws2,r,ci+1,v,{fill:isOT?bOTbg:bg,font:{bold:isOT,size:9,color:{argb:'FF'+(isOT?bOTfc:'2D3748')}},
+        align:[0,2,3,5,6,7].includes(ci)?'center':ci===4?'right':'left',
+        fmt:ci===4?'#,##0.00':ci>=5&&ci<7?'0.0"%"':null,border:true});
     });
     ws2.getRow(r).height=15;
   });
-
-  // Brand summary total row
-  const lr2=data.brandTotals.length+4;
-  spanRow(ws2,lr2,1,2,'GRAND TOTAL',{font:{bold:true,size:9,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'center'});
-  sc(ws2,lr2,3,data.totalQty,{font:{bold:true,size:9,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'center'});
-  sc(ws2,lr2,4,'',{fill:TITLE_BG});
-  sc(ws2,lr2,5,Math.round(data.totalAmt*100)/100,{font:{bold:true,size:9,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'right',fmt:'#,##0.00'});
-  sc(ws2,lr2,6,'',{fill:TITLE_BG});
-  sc(ws2,lr2,7,'',{fill:TITLE_BG});
-  ws2.getRow(lr2).height=18;
 
   const buf = await wb.xlsx.writeBuffer();
   return new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -840,12 +947,14 @@ function renderResults(data, xlsBlob) {
       <div class="section-title">Brand Preview (top 6 brands)</div>
       <div class="brand-table-wrap">
         <table class="brand-table">
-          <thead><tr><th>#</th><th>Brand</th><th>Category</th><th>Item</th><th>Color</th><th>Sizes</th><th>Qty</th><th>Priority</th></tr></thead>
+          <thead><tr><th>#</th><th>Brand</th><th>Category</th><th>Item</th><th>Color</th><th>Sizes</th><th>Qty</th><th>Priority</th><th>Order Type</th></tr></thead>
           <tbody>`;
 
   let rowNum = 0;
   for (const bt of data.brandTotals.slice(0, 6)) {
-    previewHtml += `<tr class="brand-row-header"><td colspan="8">🏷 ${bt.brand.toUpperCase()} — ${bt.totalQty} pairs | ${bt.skuCount} SKUs | ₹${Math.round(bt.totalAmt).toLocaleString('en-IN')}</td></tr>`;
+    const bOT = brandSettings[bt.brand]==='cutsize'?'✂ CUTSIZE':'📦 FULL SET';
+    const bOTclr = brandSettings[bt.brand]==='cutsize'?'#818cf8':'#f97316';
+    previewHtml += `<tr class="brand-row-header"><td colspan="9">🏷 ${bt.brand.toUpperCase()} — ${bt.totalQty} pairs | ${bt.skuCount} SKUs | ₹${Math.round(bt.totalAmt).toLocaleString('en-IN')} <span style="font-size:10px;margin-left:8px;color:${bOTclr}">${bOT}</span></td></tr>`;
     for (const item of bt.items.slice(0, 4)) {
       rowNum++;
       const pri = priority(item.qty);
@@ -860,14 +969,15 @@ function renderResults(data, xlsBlob) {
         <td style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">${sizes}</td>
         <td style="text-align:center;font-weight:600">${item.qty}</td>
         <td><span class="pill pill-${pri.toLowerCase()}">${pri}</span></td>
+        <td style="font-family:var(--font-mono);font-size:10px;font-weight:700;text-align:center;color:${brandSettings[bt.brand]==='cutsize'?'#818cf8':'#f97316'}">${brandSettings[bt.brand]==='cutsize'?'✂ CUT':'📦 SET'}</td>
       </tr>`;
     }
     if (bt.items.length > 4) {
-      previewHtml += `<tr><td colspan="8" style="color:var(--muted2);font-size:11px;font-family:var(--font-mono);padding:6px 14px">+ ${bt.items.length-4} more color variants → see Excel</td></tr>`;
+      previewHtml += `<tr><td colspan="9" style="color:var(--muted2);font-size:11px;font-family:var(--font-mono);padding:6px 14px">+ ${bt.items.length-4} more color variants → see Excel</td></tr>`;
     }
   }
   if (data.brandTotals.length > 6) {
-    previewHtml += `<tr><td colspan="8" style="color:var(--muted2);font-size:12px;font-family:var(--font-mono);padding:10px 14px">+ ${data.brandTotals.length-6} more brands in Excel</td></tr>`;
+    previewHtml += `<tr><td colspan="9" style="color:var(--muted2);font-size:12px;font-family:var(--font-mono);padding:10px 14px">+ ${data.brandTotals.length-6} more brands in Excel</td></tr>`;
   }
   previewHtml += `</tbody></table></div></div>`;
   document.getElementById('resultsArea').innerHTML = previewHtml;
