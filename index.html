@@ -941,20 +941,6 @@ function setupDrop(zoneId, handler) {
 }
 setupDrop('dropZone', handleFile);
 
-// ── FILE HANDLING ──────────────────────────────────────────────────────
-function handleFile(file) {
-  if (!file) return;
-  currentFile = file;
-  // Auto-fill period from filename date
-  const dm = file.name.match(/(\d{1,2}[-_]\w+[-_]\d{4}|\d{4}[-_]\d{2}[-_]\d{2})/);
-  if (dm) document.getElementById('cyclePeriod').value = dm[0].replace(/[-_]/g,' ');
-  else document.getElementById('cyclePeriod').value = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-
-  dz.querySelector('.upload-title').textContent = '✅ ' + file.name;
-  dz.querySelector('.upload-hint').textContent = 'File loaded. Fill details below and click Generate.';
-  document.getElementById('cycleMeta').style.display = 'flex';
-}
-
 
 function setProgress(pct, msg) {
   document.getElementById('progressFill').style.width = pct + '%';
