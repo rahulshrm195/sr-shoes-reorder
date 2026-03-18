@@ -1010,7 +1010,66 @@ function setProgress(pct, msg) {
   document.getElementById('progressStatus').textContent = msg;
 }
 
-// ── ORDER EXCEL — only ticked items, supplier-ready ───────────────────
+async function downloadOrderAndSave(btn, period) {
+  if (!parsedData || !Object.keys(orderedItems).length) {
+    toast('No items marked as ordered yet','error'); return;
+  }
+  btn.disabled = true;
+  btn.textContent = '⏳ Processing...';
+
+  try {
+    // 1. Download order Excel
+    await downloadOrderExcel(period);
+
+    // 2. Save cycle to Firebase
+    await saveCycleData();
+
+    btn.textContent = '✅ Done — Saved & Downloaded';
+    btn.style.opacity = '0.6';
+    toast('Order downloaded + cycle saved to history ✓','success');
+  } catch(e) {
+    console.error(e);
+    btn.disabled = false;
+    btn.textContent = `📋 Finalise & Download Order (${Object.keys(orderedItems).length} items)`;
+    toast(`Failed: ${e.message||e}`,'error');
+  }
+}
+
+// Extracted save logic (used by downloadOrderAndSave)
+async function saveCycleData() {
+  if (!window._firebaseReady) throw new Error('Firebase not ready');
+  const data = parsedData;
+  const period = document.getElementById('cyclePeriod').value;
+  const cycleType = document.getElementById('cycleType').value;
+
+  const summary = {
+    period, cycleType,
+    savedAt: new Date().toISOString(),
+    totalQty: data.totalQty,
+    totalAmt: data.totalAmt,
+    totalDisc: data.totalDisc,
+    skuCount: data.skuCount,
+    brandCount: data.brandTotals.length,
+    brandTotals: data.brandTotals.map(bt=>({
+      brand: bt.brand,
+      totalQty: bt.totalQty,
+      totalAmt: bt.totalAmt,
+      skuCount: bt.items.length,
+      items: bt.items.map(it=>({
+        base: it.base,
+        color: it.color||'',
+        group: it.group,
+        qty: it.qty,
+        amount: it.amount,
+        sizes: [...new Set(it.sizes)]
+      }))
+    }))
+  };
+
+  const db = window._db;
+  await window._fbAddDoc(window._fbCollection(db,'srshoes_reorder_cycles'), summary);
+  cycles.unshift(summary);
+}
 async function downloadOrderExcel(period) {
   if (!parsedData || !Object.keys(orderedItems).length) {
     toast('No items marked as ordered yet','error'); return;
@@ -1267,11 +1326,13 @@ function renderResults(data, xlsBlob) {
     </div>
     <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
       <a class="download-btn" href="${url}" download="SR_Shoes_Reorder_${period.replace(/ /g,'_')}.xlsx">⬇ Full Excel</a>
-      <button class="save-btn" id="saveBtn" onclick="saveCycle(this)">💾 Save to History</button>
-      <button class="save-btn" id="orderExcelBtn" onclick="downloadOrderExcel('${period.replace(/ /g,'_')}')" style="border-color:var(--low);color:var(--low);opacity:.4;cursor:not-allowed" disabled>📋 Download Order Excel</button>
+      <button class="save-btn" id="orderExcelBtn" onclick="downloadOrderAndSave(this,'${period.replace(/ /g,'_')}')" style="border-color:var(--low);color:var(--low);opacity:.4;cursor:not-allowed" disabled>📋 Finalise & Download Order</button>
     </div>
-    <div style="font-size:12px;color:var(--muted2);font-family:var(--font-mono);margin-bottom:20px">
-      Tick items as ordered → Order Excel auto-populates with only those items.
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <div style="font-size:12px;color:var(--muted2);font-family:var(--font-mono)">
+        Tick items as ordered → Finalise saves to history + downloads order Excel in one click.
+      </div>
+      <button id="saveCycleOnly" onclick="saveCycleOnly(this)" style="background:none;border:none;color:var(--muted2);font-size:11px;font-family:var(--font-mono);cursor:pointer;text-decoration:underline;white-space:nowrap;padding:0">Save cycle only</button>
     </div>`;
 
   // ── Checklist ──
@@ -1336,46 +1397,30 @@ function renderResults(data, xlsBlob) {
 }
 
 // ── FIREBASE ───────────────────────────────────────────────────────────
+async function saveCycleOnly(btn) {
+  if (!window._firebaseReady) { toast('Firebase not ready','error'); return; }
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  try {
+    await saveCycleData();
+    btn.textContent = '✓ Saved';
+    btn.style.color = 'var(--low)';
+    toast('Cycle saved to history ✓','success');
+  } catch(e) {
+    console.error(e);
+    toast('Save failed','error');
+    btn.disabled = false;
+    btn.textContent = 'Save cycle only';
+  }
+}
+
 async function saveCycle(btn) {
   if (!window._firebaseReady) { toast('Firebase not connected yet','error'); return; }
   btn.disabled = true;
   btn.textContent = 'Saving...';
-  const period = document.getElementById('cyclePeriod').value;
-  const cycleType = document.getElementById('cycleType').value;
-  const data = parsedData;
-
-  // Compress: store brand totals summary (not every row)
-  const summary = {
-    period,
-    cycleType,
-    savedAt: new Date().toISOString(),
-    totalQty: data.totalQty,
-    totalAmt: data.totalAmt,
-    totalDisc: data.totalDisc,
-    skuCount: data.skuCount,
-    brandCount: data.brandTotals.length,
-    brandTotals: data.brandTotals.map(bt=>({
-      brand: bt.brand,
-      totalQty: bt.totalQty,
-      totalAmt: bt.totalAmt,
-      skuCount: bt.items.length,
-      items: bt.items.map(it=>({
-        base: it.base,
-        color: it.color||'',
-        group: it.group,
-        qty: it.qty,
-        amount: it.amount,
-        sizes: [...new Set(it.sizes)]  // store unique sizes for full set tracking
-      }))
-    }))
-  };
-
   try {
-    const db = window._db;
-    await window._fbAddDoc(window._fbCollection(db,'srshoes_reorder_cycles'), summary);
+    await saveCycleData();
     btn.style.display='none';
-    document.querySelector('.save-btn')?.insertAdjacentHTML('afterend','<span class="saved-badge">✅ Saved to History</span>');
-    cycles.push(summary);
     toast('Cycle saved to history ✓','success');
   } catch(e) {
     console.error(e);
