@@ -637,9 +637,15 @@ const BRAND_RULES = [
 
 function getBrand(name) {
   for (const [brand, rx] of BRAND_RULES) {
-    if (rx.test(name)) return brand;
+    if (rx.test(name)) {
+      if (brand !== 'Other') discoveredBrands.add(brand);
+      return brand;
+    }
   }
-  return 'Other';
+  // Unknown brand — use first word as brand name and register it
+  const unknown = name.split(/[\s\-_]/)[0].trim();
+  if (unknown) discoveredBrands.add(unknown);
+  return unknown || 'Other';
 }
 function stripSize(name) {
   return name.replace(/\s+[\d]+[Kk]?[Mm]?$/,'').trim();
@@ -657,11 +663,12 @@ function priority(qty) {
 }
 
 // ── STATE ─────────────────────────────────────────────────────────────
-let parsedData    = null;
-let currentFile   = null;
-let cycles        = [];
-let brandSettings = {};
-let orderedItems  = {};  // key: base||color||brand → {orderedAt}
+let parsedData       = null;
+let currentFile      = null;
+let cycles           = [];
+let brandSettings    = {};
+let orderedItems     = {};
+let discoveredBrands = new Set(); // grows with every XLS upload
 
 // ── FILE HANDLING ──────────────────────────────────────────────────────
 function handleFile(file) {
@@ -818,6 +825,7 @@ async function processFile() {
   setProgress(100, 'Done!');
 
   renderResults(parsedData, xlsBlob);
+  renderSettings(); // refresh to show any newly discovered brands
   document.getElementById('progressWrap').style.display = 'none';
   document.getElementById('processBtn').disabled = false;
 }
@@ -828,9 +836,11 @@ async function loadSettings() {
   try {
     const db=window._db;
     const snap=await window._fbGetDocs(window._fbCollection(db,'srshoes_brand_settings'));
-    snap.forEach(d=>{ brandSettings[d.id]=d.data().orderType||'fullset'; });
+    snap.forEach(d=>{
+      brandSettings[d.id]=d.data().orderType||'fullset';
+      discoveredBrands.add(d.id); // restore previously discovered brands
+    });
   } catch(e){ console.error('loadSettings:',e); }
-  // Always render settings after load so rows exist even before tab is clicked
   renderSettings();
 }
 
@@ -932,16 +942,24 @@ async function masterReset() {
 }
 
 function renderSettings() {
-  const brands = BRAND_RULES.map(([b])=>b).filter(b=>b!=='Other');
-  const list=document.getElementById('settingsBrandList');
-  list.innerHTML=brands.map(brand=>{
-    const ot=brandSettings[brand]||'fullset';
+  // Merge: hardcoded brands + discovered from uploaded data + saved from Firebase
+  const knownBrands = new Set(BRAND_RULES.map(([b])=>b).filter(b=>b!=='Other'));
+  const allBrands   = new Set([...knownBrands, ...discoveredBrands, ...Object.keys(brandSettings)]);
+  const sorted      = [...allBrands].sort();
+
+  const list = document.getElementById('settingsBrandList');
+  if (!list) return;
+  list.innerHTML = sorted.map(brand => {
+    const ot      = brandSettings[brand] || 'fullset';
+    const isNew   = !knownBrands.has(brand) && !brandSettings[brand];
     return `<div class="brand-setting-row" data-brand="${brand}">
-      <div class="bsr-name">${brand}</div>
+      <div>
+        <div class="bsr-name">${brand} ${isNew ? '<span style="font-size:10px;background:rgba(249,115,22,.15);color:var(--accent);border-radius:4px;padding:1px 6px;font-family:var(--font-mono);font-weight:700">NEW</span>' : ''}</div>
+      </div>
       <div class="toggle-wrap">
-        <button class="toggle-btn cutsize ${ot==='cutsize'?'active':''}" 
+        <button class="toggle-btn cutsize ${ot==='cutsize'?'active':''}"
           onclick="toggleBrandSetting(this,'cutsize')">✂ CUTSIZE</button>
-        <button class="toggle-btn fullset ${ot==='fullset'?'active':''}" 
+        <button class="toggle-btn fullset ${ot==='fullset'?'active':''}"
           onclick="toggleBrandSetting(this,'fullset')">📦 FULL SET</button>
       </div>
     </div>`;
