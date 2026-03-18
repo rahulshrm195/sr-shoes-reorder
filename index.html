@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>SR Shoes – Reorder Tool</title>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#0f172a"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+
+<!-- SheetJS for XLS parsing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- ExcelJS for output generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
+import { getFirestore, collection, addDoc, getDocs, orderBy, query } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBm7cmZKWBZTUUaof-2vv20E513vH4sRi8",
+  authDomain: "sr-shoes-reorder.firebaseapp.com",
+  projectId: "sr-shoes-reorder",
+  storageBucket: "sr-shoes-reorder.firebasestorage.app",
+  messagingSenderId: "391006243111",
+  appId: "1:391006243111:web:339d212abca423f3a80102"
+};
+
+/*
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+*/
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+window._db = db;
+window._fbCollection = collection;
+window._fbAddDoc = addDoc;
+window._fbGetDocs = getDocs;
+window._fbOrderBy = orderBy;
+window._fbQuery = query;
+window._firebaseReady = true;
+window.dispatchEvent(new Event('firebaseReady'));
+</script>
+
+<style>
+:root{
+  --bg:#0f172a;
+  --surface:#1e293b;
+  --surface2:#263347;
+  --border:#334155;
+  --accent:#f97316;
+  --accent2:#fb923c;
+  --text:#f1f5f9;
+  --muted:#94a3b8;
+  --muted2:#64748b;
+  --high:#ef4444;
+  --high-bg:rgba(239,68,68,.12);
+  --med:#f59e0b;
+  --med-bg:rgba(245,158,11,.12);
+  --low:#22c55e;
+  --low-bg:rgba(34,197,94,.12);
+  --font-head:'Syne',sans-serif;
+  --font-body:'DM Sans',sans-serif;
+  --font-mono:'DM Mono',monospace;
+  --radius:12px;
+  --radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;overflow-x:hidden}
+
+/* ── Login ── */
+#loginScreen{
+  position:fixed;inset:0;z-index:999;
+  background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+}
+.login-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:20px;padding:48px 40px;width:100%;max-width:380px;
+  box-shadow:0 40px 80px rgba(0,0,0,.5);
+}
+.login-logo{
+  font-family:var(--font-head);font-size:28px;font-weight:800;
+  color:var(--accent);letter-spacing:-1px;margin-bottom:4px;
+}
+.login-sub{color:var(--muted);font-size:13px;margin-bottom:36px}
+.login-label{font-size:12px;color:var(--muted);font-family:var(--font-mono);letter-spacing:.08em;margin-bottom:8px;display:block}
+.login-input{
+  width:100%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:12px 16px;color:var(--text);
+  font-family:var(--font-body);font-size:15px;outline:none;
+  transition:border-color .2s;
+}
+.login-input:focus{border-color:var(--accent)}
+.login-btn{
+  width:100%;margin-top:20px;background:var(--accent);color:#fff;
+  border:none;border-radius:var(--radius-sm);padding:13px;
+  font-family:var(--font-head);font-size:15px;font-weight:700;
+  cursor:pointer;transition:opacity .2s;letter-spacing:.02em;
+}
+.login-btn:hover{opacity:.88}
+.login-err{color:var(--high);font-size:13px;margin-top:10px;display:none}
+
+/* ── App Shell ── */
+#app{display:none}
+.topbar{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:0 24px;height:58px;display:flex;align-items:center;gap:16px;
+  position:sticky;top:0;z-index:100;
+}
+.topbar-logo{font-family:var(--font-head);font-weight:800;font-size:18px;color:var(--accent);letter-spacing:-.5px}
+.topbar-sep{color:var(--border);font-size:18px}
+.nav-tabs{display:flex;gap:4px;margin-left:auto}
+.nav-tab{
+  background:none;border:none;color:var(--muted);
+  font-family:var(--font-body);font-size:13px;font-weight:500;
+  padding:6px 14px;border-radius:6px;cursor:pointer;transition:all .2s;
+}
+.nav-tab.active,.nav-tab:hover{background:var(--surface2);color:var(--text)}
+.nav-tab.active{color:var(--accent)}
+.logout-btn{
+  background:none;border:1px solid var(--border);color:var(--muted);
+  font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer;
+  font-family:var(--font-mono);transition:all .2s;margin-left:8px;
+}
+.logout-btn:hover{border-color:var(--high);color:var(--high)}
+
+/* ── Pages ── */
+.page{display:none;padding:28px 28px 60px}
+.page.active{display:block}
+
+/* ── Upload Page ── */
+.upload-zone{
+  border:2px dashed var(--border);border-radius:var(--radius);
+  padding:60px 32px;text-align:center;cursor:pointer;
+  transition:all .25s;background:var(--surface);position:relative;
+  max-width:600px;margin:0 auto;
+}
+.upload-zone.drag{border-color:var(--accent);background:rgba(249,115,22,.06)}
+.upload-icon{font-size:48px;margin-bottom:16px}
+.upload-title{font-family:var(--font-head);font-size:20px;font-weight:700;margin-bottom:8px}
+.upload-hint{color:var(--muted);font-size:13px}
+.upload-input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.cycle-meta{
+  max-width:600px;margin:20px auto 0;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:20px;
+  display:none;gap:16px;flex-wrap:wrap;align-items:flex-end;
+}
+.meta-field{flex:1;min-width:160px}
+.meta-label{font-size:11px;color:var(--muted);font-family:var(--font-mono);letter-spacing:.08em;margin-bottom:6px}
+.meta-input,.meta-select{
+  width:100%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:9px 12px;color:var(--text);
+  font-family:var(--font-body);font-size:14px;outline:none;
+}
+.meta-input:focus,.meta-select:focus{border-color:var(--accent)}
+.process-btn{
+  background:var(--accent);color:#fff;border:none;
+  border-radius:var(--radius-sm);padding:10px 24px;
+  font-family:var(--font-head);font-size:14px;font-weight:700;
+  cursor:pointer;white-space:nowrap;transition:opacity .2s;
+}
+.process-btn:hover{opacity:.85}
+.process-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── Progress ── */
+.progress-wrap{max-width:600px;margin:20px auto 0;display:none}
+.progress-bar-bg{background:var(--surface2);border-radius:99px;height:6px;overflow:hidden}
+.progress-bar-fill{background:var(--accent);height:100%;width:0%;transition:width .3s;border-radius:99px}
+.progress-status{font-size:12px;color:var(--muted);font-family:var(--font-mono);margin-top:8px}
+
+/* ── Results ── */
+.results-wrap{max-width:960px;margin:0 auto}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
+.stat-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:18px 20px;
+}
+.stat-val{font-family:var(--font-head);font-size:28px;font-weight:800;color:var(--accent)}
+.stat-label{font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--font-mono)}
+
+.section-title{
+  font-family:var(--font-head);font-size:13px;font-weight:700;
+  color:var(--muted);letter-spacing:.1em;text-transform:uppercase;
+  margin:24px 0 12px;
+}
+.download-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--accent);color:#fff;border:none;
+  border-radius:var(--radius-sm);padding:11px 22px;
+  font-family:var(--font-head);font-size:14px;font-weight:700;
+  cursor:pointer;transition:opacity .2s;text-decoration:none;
+}
+.download-btn:hover{opacity:.85}
+.save-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--surface2);color:var(--text);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:11px 22px;
+  font-family:var(--font-head);font-size:14px;font-weight:700;
+  cursor:pointer;transition:all .2s;margin-left:10px;
+}
+.save-btn:hover{border-color:var(--accent);color:var(--accent)}
+.save-btn:disabled{opacity:.4;cursor:not-allowed}
+.saved-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--low-bg);color:var(--low);
+  border:1px solid rgba(34,197,94,.2);border-radius:6px;
+  padding:6px 14px;font-size:13px;font-family:var(--font-mono);
+  margin-left:10px;
+}
+
+/* brand table preview */
+.brand-table-wrap{overflow-x:auto;margin-top:12px}
+.brand-table{width:100%;border-collapse:collapse;font-size:13px}
+.brand-table th{
+  background:var(--surface2);color:var(--muted);
+  font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;
+  padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+.brand-table td{padding:9px 14px;border-bottom:1px solid rgba(51,65,85,.4)}
+.brand-table tr:last-child td{border-bottom:none}
+.brand-table tr:hover td{background:rgba(255,255,255,.02)}
+.brand-row-header td{
+  background:rgba(249,115,22,.08);color:var(--accent);
+  font-family:var(--font-head);font-weight:700;font-size:12px;
+  padding:7px 14px;border-bottom:1px solid rgba(249,115,22,.2);
+}
+.pill{
+  display:inline-block;border-radius:4px;padding:2px 8px;
+  font-size:11px;font-weight:700;font-family:var(--font-mono);
+}
+.pill-high{background:var(--high-bg);color:var(--high)}
+.pill-med{background:var(--med-bg);color:var(--med)}
+.pill-low{background:var(--low-bg);color:var(--low)}
+
+/* ── History Page ── */
+.history-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:16px}
+.history-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:20px;cursor:pointer;
+  transition:all .2s;
+}
+.history-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.hc-date{font-family:var(--font-mono);font-size:11px;color:var(--muted);margin-bottom:6px}
+.hc-label{font-family:var(--font-head);font-size:17px;font-weight:700;margin-bottom:10px}
+.hc-stats{display:flex;gap:16px;flex-wrap:wrap}
+.hc-stat{font-size:12px;color:var(--muted)}
+.hc-stat span{color:var(--text);font-weight:600}
+.hc-actions{margin-top:14px;display:flex;gap:8px}
+.hc-btn{
+  background:var(--surface2);border:1px solid var(--border);color:var(--muted);
+  font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer;
+  font-family:var(--font-mono);transition:all .2s;
+}
+.hc-btn:hover{border-color:var(--accent);color:var(--accent)}
+.empty-state{
+  text-align:center;padding:80px 32px;color:var(--muted2);
+}
+.empty-icon{font-size:48px;margin-bottom:16px}
+.empty-title{font-family:var(--font-head);font-size:18px;color:var(--muted);margin-bottom:8px}
+
+/* ── Trends Page ── */
+.trends-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:16px}
+@media(max-width:720px){.trends-grid{grid-template-columns:1fr}}
+.trend-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:20px;
+}
+.trend-card-title{font-family:var(--font-head);font-size:14px;font-weight:700;margin-bottom:16px;color:var(--accent)}
+.repeat-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 0;border-bottom:1px solid rgba(51,65,85,.4);
+}
+.repeat-item:last-child{border-bottom:none}
+.repeat-name{font-size:13px;color:var(--text)}
+.repeat-brand{font-size:11px;color:var(--muted);font-family:var(--font-mono)}
+.repeat-count{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;padding:3px 10px;
+  font-family:var(--font-mono);font-size:12px;color:var(--accent);white-space:nowrap;
+}
+.cycle-bar-wrap{margin-bottom:14px}
+.cycle-bar-label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:5px;font-family:var(--font-mono)}
+.cycle-bar-bg{background:var(--surface2);border-radius:99px;height:8px;overflow:hidden}
+.cycle-bar-fill{background:var(--accent);height:100%;border-radius:99px;transition:width .6s ease}
+
+.brand-trend-row{
+  display:flex;align-items:center;gap:12px;
+  padding:8px 0;border-bottom:1px solid rgba(51,65,85,.3);
+}
+.brand-trend-row:last-child{border-bottom:none}
+.bt-name{font-size:13px;flex:1}
+.bt-cycles{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.bt-bar-bg{width:80px;background:var(--surface2);border-radius:99px;height:5px}
+.bt-bar-fill{background:var(--accent2);height:100%;border-radius:99px}
+
+/* ── Modal ── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+.modal-overlay.open{display:flex}
+.modal{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);max-width:800px;width:100%;
+  max-height:85vh;overflow-y:auto;padding:28px;
+}
+.modal-title{font-family:var(--font-head);font-size:18px;font-weight:700;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
+.modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px}
+.modal-close:hover{color:var(--text)}
+
+/* toast */
+.toast{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:12px 22px;
+  font-size:13px;font-family:var(--font-mono);
+  opacity:0;transition:all .3s;pointer-events:none;z-index:999;white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.success{border-color:var(--low);color:var(--low)}
+.toast.error{border-color:var(--high);color:var(--high)}
+
+/* loading overlay */
+.loader{
+  position:fixed;inset:0;background:rgba(15,23,42,.85);z-index:800;
+  display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;
+}
+.loader.show{display:flex}
+.spinner{
+  width:40px;height:40px;border:3px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;
+  animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-text{font-family:var(--font-mono);font-size:13px;color:var(--muted)}
+
+@media(max-width:600px){
+  .topbar{padding:0 16px}
+  .page{padding:16px 16px 60px}
+  .nav-tab span{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">SR Shoes</div>
+    <div class="login-sub">Reorder Management Tool</div>
+    <label class="login-label">PASSWORD</label>
+    <input type="password" class="login-input" id="loginPass" placeholder="Enter password" autocomplete="current-password"/>
+    <button class="login-btn" onclick="doLogin()">Access Tool →</button>
+    <div class="login-err" id="loginErr">Incorrect password. Try again.</div>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-logo">SR Shoes</div>
+    <div class="topbar-sep">|</div>
+    <span style="font-size:13px;color:var(--muted);font-family:var(--font-mono)">Reorder Tool</span>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="showPage('upload',this)">📤 <span>Upload</span></button>
+      <button class="nav-tab" onclick="showPage('history',this)">📁 <span>History</span></button>
+      <button class="nav-tab" onclick="showPage('trends',this)">📈 <span>Trends</span></button>
+    </div>
+    <button class="logout-btn" onclick="doLogout()">Logout</button>
+  </div>
+
+  <!-- Upload Page -->
+  <div class="page active" id="page-upload">
+    <div class="upload-zone" id="dropZone">
+      <input type="file" class="upload-input" id="fileInput" accept=".xls,.xlsx" onchange="handleFile(this.files[0])"/>
+      <div class="upload-icon">📊</div>
+      <div class="upload-title">Drop your Party-wise Summary XLS</div>
+      <div class="upload-hint">Export → Reports → Party-wise Summary → All Parties → drop here<br/>Supports .xls and .xlsx  |  Color data included automatically</div>
+    </div>
+
+    <div class="cycle-meta" id="cycleMeta">
+      <div class="meta-field">
+        <div class="meta-label">CYCLE DATE / PERIOD</div>
+        <input type="text" class="meta-input" id="cyclePeriod" placeholder="e.g. 17 Mar 2026"/>
+      </div>
+      <div class="meta-field">
+        <div class="meta-label">CYCLE TYPE</div>
+        <select class="meta-select" id="cycleType">
+          <option>Weekly</option>
+          <option>Fortnightly</option>
+          <option>Monthly</option>
+          <option>Custom</option>
+        </select>
+      </div>
+      <button class="process-btn" id="processBtn" onclick="processFile()">Generate Report →</button>
+    </div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+      <div class="progress-status" id="progressStatus">Parsing file...</div>
+    </div>
+
+    <div id="resultsArea"></div>
+  </div>
+
+  <!-- History Page -->
+  <div class="page" id="page-history">
+    <div class="section-title">Past Cycles</div>
+    <div id="historyContent"><div class="empty-state"><div class="empty-icon">📂</div><div class="empty-title">No cycles saved yet</div><div>Upload and save your first cycle to see history here.</div></div></div>
+  </div>
+
+  <!-- Trends Page -->
+  <div class="page" id="page-trends">
+    <div class="section-title">Reorder Trends</div>
+    <div id="trendsContent"><div class="empty-state"><div class="empty-icon">📈</div><div class="empty-title">Not enough data yet</div><div>Save at least 2 cycles to see trends.</div></div></div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-title"><span id="modalTitle">Cycle Detail</span><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+<!-- Loader -->
+<div class="loader" id="loader"><div class="spinner"></div><div class="loader-text" id="loaderText">Processing...</div></div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────
+const PASSWORD = 'srshoes2026';   // ← change this
+
+// ── BRAND RULES ───────────────────────────────────────────────────────
+const BRAND_RULES = [
+  ['Action',        /^Action/i],
+  ['Aerowalk',      /^Aerowalk/i],
+  ['Air Ads',       /^Air Ads/i],
+  ['Airfax',        /^Airfax/i],
+  ['Airwalk',       /^Airwalk/i],
+  ['Apex',          /^Apex/i],
+  ['Asian',         /^Asian/i],
+  ['AYGO',          /^AYGO|^Aygo/i],
+  ['Baby Naina',    /^Baby Naina/i],
+  ['Ballentine',    /^Ballentine/i],
+  ['Barun',         /^Barun/i],
+  ['BATA',          /^BATA|^Bata/i],
+  ['Big Daddy',     /^Big Daddy/i],
+  ['Blue Bird',     /^Blue Bird/i],
+  ['Campus',        /^Campus/i],
+  ['Chillax',       /^Chillax/i],
+  ['CLD',           /^CLD/i],
+  ['Columbus',      /^Columbus/i],
+  ['CRUZE',         /^CRUZE/i],
+  ['DAYZ',          /^DAYZ|^Dayz/i],
+  ['Dorson',        /^Dorson/i],
+  ['FLITE',         /^FLITE|^Flite/i],
+  ['GL Collection', /^GL Collection/i],
+  ['Inblu',         /^Inblu/i],
+  ['JQR',           /^JQR/i],
+  ['Jockey',        /^Jockey/i],
+  ['Kerry',         /^Kerry/i],
+  ['Kevin Ford',    /^Kevin Ford/i],
+  ['Kido',          /^Kido/i],
+  ['KinderJoy',     /^KinderJoy/i],
+  ['Klicker',       /^Klicker/i],
+  ['Koves',         /^Koves/i],
+  ['Lakhani',       /^LAKHANI|^Lakhani/i],
+  ['Lancer',        /^LANCER|^Lancer/i],
+  ['LIBERTY',       /^LIBERTY/i],
+  ['Lexa',          /^Lexa/i],
+  ['Madam Tanu',    /^Madam T/i],
+  ['Mark',          /^Mark/i],
+  ['MOCS',          /^MOCS/i],
+  ['Mosach',        /^Mosach/i],
+  ['Nelson',        /^Nelson/i],
+  ['Nexo',          /^Nexo/i],
+  ['Nike',          /^Nike/i],
+  ['Oofoam',        /^Oofoam/i],
+  ['Ortho',         /^Ortho/i],
+  ['P-Toes',        /^P-Toes/i],
+  ['Paragon',       /^Paragon|^Paralite|^PARAGON|^Vertex/i],
+  ['PEAKANZ',       /^PEAKANZ/i],
+  ['Punch',         /^Punch/i],
+  ['QRITE',         /^QRITE/i],
+  ['QT Foam',       /^QT/i],
+  ['Relaxo',        /^Relaxo/i],
+  ['SCR',           /^SCR/i],
+  ['Solea',         /^Solea/i],
+  ['SPARX',         /^SPARX|^Sparx|^Spark/i],
+  ['SPYN',          /^SPYN/i],
+  ['Step On Sky',   /^Step On/i],
+  ['Ston Max',      /^Ston/i],
+  ['Today',         /^TODAY|^Today/i],
+  ['Town Business', /^Town/i],
+  ['Trufit',        /^TRUFIT|^Truefit|^Trufit/i],
+  ['Tucson',        /^Tucson/i],
+  ['VKC',           /^VKC/i],
+  ['Walkaroo',      /^Walkaroo|^Walkaro|^WalkaroO|^Walkmate|^Wakmate/i],
+  ['Welcome',       /^Welcome/i],
+  ['bob life',      /^bob life/i],
+  ['Woodland',      /^Woodland/i],
+  ['Other',         /.*/],
+];
+
+function getBrand(name) {
+  for (const [brand, rx] of BRAND_RULES) {
+    if (rx.test(name)) return brand;
+  }
+  return 'Other';
+}
+function stripSize(name) {
+  return name.replace(/\s+[\d]+[Kk]?[Mm]?$/,'').trim();
+}
+function parseColorSize(cs) {
+  cs = String(cs).trim();
+  const SKIP = ['Mens Belt','Items With No Entry','nan',''];
+  if (SKIP.includes(cs)) return {color:'', size:''};
+  const m = cs.match(/^(.*?)\s+([\d]+[Kk]?[Mm]?)$/);
+  if (m) return {color: m[1].trim(), size: m[2].trim()};
+  return {color: cs, size: ''};
+}
+function priority(qty) {
+  return qty >= 5 ? 'HIGH' : qty >= 3 ? 'MED' : 'LOW';
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────
+let parsedData = null;   // current cycle's processed data
+let currentFile = null;
+let cycles = [];         // loaded from Firebase
+
+// ── LOGIN ─────────────────────────────────────────────────────────────
+document.getElementById('loginPass').addEventListener('keyup', e => { if(e.key==='Enter') doLogin(); });
+function doLogin() {
+  const v = document.getElementById('loginPass').value;
+  if (v === PASSWORD) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    loadCycles();
+  } else {
+    document.getElementById('loginErr').style.display = 'block';
+  }
+}
+function doLogout() {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginPass').value = '';
+}
+
+// ── NAV ───────────────────────────────────────────────────────────────
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'history') renderHistory();
+  if (id === 'trends') renderTrends();
+}
+
+// ── DRAG DROP ─────────────────────────────────────────────────────────
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); const f=e.dataTransfer.files[0]; if(f) handleFile(f); });
+
+// ── FILE HANDLING ──────────────────────────────────────────────────────
+function handleFile(file) {
+  if (!file) return;
+  currentFile = file;
+  // Auto-fill period from filename date
+  const dm = file.name.match(/(\d{1,2}[-_]\w+[-_]\d{4}|\d{4}[-_]\d{2}[-_]\d{2})/);
+  if (dm) document.getElementById('cyclePeriod').value = dm[0].replace(/[-_]/g,' ');
+  else document.getElementById('cyclePeriod').value = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+
+  dz.querySelector('.upload-title').textContent = '✅ ' + file.name;
+  dz.querySelector('.upload-hint').textContent = 'File loaded. Fill details below and click Generate.';
+  document.getElementById('cycleMeta').style.display = 'flex';
+}
+
+// ── PARSE & PROCESS ────────────────────────────────────────────────────
+async function processFile() {
+  if (!currentFile) return;
+  setProgress(10, 'Reading file...');
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('processBtn').disabled = true;
+
+  const buf = await currentFile.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array'});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+  setProgress(30, 'Parsing rows...');
+
+  // Find header row — PartyWise has: PartyName | InvGroup | InventoryName | Qty | TOTQTY | FreeQty | BasicAmt | DiscAmt ...
+  let headerRow = -1;
+  for (let i = 0; i < Math.min(raw.length, 10); i++) {
+    const r = raw[i].map(c=>String(c).trim().toLowerCase());
+    if (r.includes('invgroup') || r.includes('inventoryname') || (r.includes('partyname') && r.includes('qty'))) {
+      headerRow = i; break;
+    }
+  }
+  if (headerRow < 0) headerRow = 5; // PartyWise default fallback
+
+  // Col indices for PartyWise: 0=Party, 1=Group, 2=InventoryName, 3=ColorSize, 4=TOTQTY, 5=FreeQty, 6=BasicAmt, 7=DiscAmt
+  const rows = [];
+  for (let i = headerRow+1; i < raw.length; i++) {
+    const r = raw[i];
+    const invName  = String(r[2]||'').trim();
+    const colorSize= String(r[3]||'').trim();
+    if (!invName || invName === 'InventoryName' || invName.toLowerCase().startsWith('total')) continue;
+    const qty = parseFloat(r[5]);   // FreeQty col = actual qty sold per line
+    if (isNaN(qty) || qty <= 0) continue;
+    const group  = String(r[1]||'').trim();
+    const amount = parseFloat(r[6]) || 0;  // BasicAmt
+    const disc   = parseFloat(r[7]) || 0;  // DiscAmt
+    const {color, size} = parseColorSize(colorSize);
+    const base  = stripSize(invName);
+    const brand = getBrand(base);
+    rows.push({group, invName, base, color, size, brand, qty, amount, disc});
+  }
+
+  setProgress(60, 'Aggregating by brand & color...');
+
+  // Aggregate: brand → base_item → color (each color = separate line)
+  const brandMap = {};
+  for (const r of rows) {
+    if (!brandMap[r.brand]) brandMap[r.brand] = {};
+    // key = base item + group + color so each color variant is its own row
+    const k = `${r.base}||${r.group}||${r.color}`;
+    if (!brandMap[r.brand][k]) brandMap[r.brand][k] = {
+      base:r.base, group:r.group, brand:r.brand,
+      color:r.color, qty:0, amount:0, sizes:[]
+    };
+    brandMap[r.brand][k].qty    += r.qty;
+    brandMap[r.brand][k].amount += r.amount;
+    if (r.size) brandMap[r.brand][k].sizes.push(r.size);
+  }
+
+  // Build brand totals + sort
+  const brandTotals = Object.entries(brandMap).map(([brand, items]) => {
+    const itemArr = Object.values(items).sort((a,b)=>b.qty-a.qty);
+    const totalQty = itemArr.reduce((s,x)=>s+x.qty,0);
+    const totalAmt = itemArr.reduce((s,x)=>s+x.amount,0);
+    // unique SKU count (base items, ignoring color variants)
+    const skuCount = new Set(itemArr.map(x=>x.base)).size;
+    return {brand, items:itemArr, totalQty, totalAmt, skuCount};
+  }).sort((a,b)=>b.totalQty-a.totalQty);
+
+  const totalQty  = rows.reduce((s,r)=>s+r.qty,0);
+  const totalAmt  = rows.reduce((s,r)=>s+r.amount,0);
+  const totalDisc = rows.reduce((s,r)=>s+r.disc,0);
+
+  parsedData = {rows, brandTotals, totalQty, totalAmt, totalDisc, skuCount:rows.length};
+
+  setProgress(80, 'Generating Excel...');
+  const xlsBlob = await generateExcel(parsedData, document.getElementById('cyclePeriod').value, document.getElementById('cycleType').value);
+  setProgress(100, 'Done!');
+
+  renderResults(parsedData, xlsBlob);
+  document.getElementById('progressWrap').style.display = 'none';
+  document.getElementById('processBtn').disabled = false;
+}
+
+function setProgress(pct, msg) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressStatus').textContent = msg;
+}
+
+// ── EXCEL GENERATION ───────────────────────────────────────────────────
+async function generateExcel(data, period, cycleType) {
+  const wb = new ExcelJS.Workbook();
+
+  // ── Sheet 1: Brand Reorder ──
+  const ws = wb.addWorksheet('Brand Reorder');
+  ws.views = [{showGridLines:false,state:'frozen',ySplit:5}];
+
+  const TITLE_BG='1A202C', BRAND_BG='553C9A', HDR_BG='6B46C1';
+  const HIGH_BG='FED7D7', MED_BG='FEFCBF', LOW_BG='C6F6D5';
+  const HIGH_FC='C53030', MED_FC='744210', LOW_FC='22543D';
+  const ALT='FAF5FF', WHITE='FFFFFF', BRAND_FC='FFFFFF', HDR_FC='FFFFFF';
+
+  function cell(ws, r, c, v, opts={}) {
+    const cell = ws.getCell(r,c);
+    cell.value = v;
+    if (opts.font) cell.font = {name:'Arial',size:9,...opts.font};
+    else cell.font = {name:'Arial',size:9};
+    if (opts.fill) cell.fill = {type:'pattern',pattern:'solid',fgColor:{argb:'FF'+opts.fill}};
+    if (opts.align) cell.alignment = {horizontal:opts.align,vertical:'middle',wrapText:!!opts.wrap};
+    else cell.alignment = {vertical:'middle'};
+    if (opts.fmt) cell.numFmt = opts.fmt;
+    if (opts.border) {
+      const s = {style:'thin',color:{argb:'FFCCCCCC'}};
+      cell.border = {left:s,right:s,top:s,bottom:s};
+    }
+  }
+  function merge(ws,r1,c1,r2,c2){ws.mergeCells(r1,c1,r2,c2)}
+
+  // Title
+  merge(ws,1,1,1,10);
+  cell(ws,1,1,`SR Shoes – Brand Reorder  |  ${period}  (${cycleType})`,
+    {font:{bold:true,size:13,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'center'});
+  ws.getRow(1).height=28;
+
+  merge(ws,2,1,2,10);
+  cell(ws,2,1,`Qty Sold: ${data.totalQty}  |  Revenue: ₹${data.totalAmt.toLocaleString('en-IN',{maximumFractionDigits:0})}  |  Discount: ₹${data.totalDisc.toLocaleString('en-IN',{maximumFractionDigits:0})}  |  SKUs: ${data.skuCount}`,
+    {font:{size:9,color:{argb:'FF553C9A'}},fill:'EDE9FE',align:'center'});
+  ws.getRow(2).height=15;
+
+  merge(ws,3,1,3,10);
+  cell(ws,3,1,'Priority: HIGH ≥5 pairs  |  MED 3-4 pairs  |  LOW 1-2 pairs',
+    {font:{size:8,italic:true,color:{argb:'FF718096'}},fill:'F7FAFC',align:'center'});
+  ws.getRow(3).height=13;
+  ws.getRow(4).height=5;
+
+  // Headers — with Color column
+  const HDRS=['#','Brand','Category','Item Name','Color','Sizes','Qty','Brand SKUs','Revenue (₹)','Priority'];
+  const WIDS=[4,16,22,34,18,14,8,10,14,10];
+  HDRS.forEach((h,i)=>{
+    cell(ws,5,i+1,h,{font:{bold:true,size:9,color:{argb:'FF'+HDR_FC}},fill:HDR_BG,align:'center'});
+  });
+  WIDS.forEach((w,i)=>ws.getColumn(i+1).width=w);
+  ws.getRow(5).height=20;
+
+  let curRow=6, rowNum=0;
+  for (const bt of data.brandTotals) {
+    // Brand header
+    merge(ws,curRow,1,curRow,10);
+    cell(ws,curRow,1,`  ${bt.brand.toUpperCase()}   —   ${bt.totalQty} pairs  |  ${bt.skuCount} SKUs  |  ₹${bt.totalAmt.toLocaleString('en-IN',{maximumFractionDigits:0})}`,
+      {font:{bold:true,size:9,color:{argb:'FF'+BRAND_FC}},fill:BRAND_BG});
+    ws.getRow(curRow).height=18;
+    curRow++;
+
+    bt.items.forEach((item,idx)=>{
+      rowNum++;
+      const r=curRow;
+      const bg=idx%2===0?ALT:WHITE;
+      const pri=priority(item.qty);
+      const priBG=pri==='HIGH'?HIGH_BG:pri==='MED'?MED_BG:LOW_BG;
+      const priFC=pri==='HIGH'?HIGH_FC:pri==='MED'?MED_FC:LOW_FC;
+      const sizes=[...new Set(item.sizes)].sort().join(', ')||'—';
+      const colorVal = item.color || '—';
+
+      // col: 1=#  2=brand(blank)  3=group  4=base  5=color  6=sizes  7=qty  8=skuCount  9=revenue  10=priority
+      const rowData=[rowNum,'',item.group,item.base,colorVal,sizes,item.qty,bt.skuCount,
+        Math.round(item.amount*100)/100, pri];
+      rowData.forEach((v,ci)=>{
+        const isAmt=ci===8, isPri=ci===9, isNum=ci===0||ci===6||ci===7;
+        const isColor=ci===4;
+        cell(ws,r,ci+1,v,{
+          fill: isPri?priBG : isColor&&colorVal!=='—'?'F0F4FF' : bg,
+          font:{bold:isPri,size:9,color:{argb:'FF'+(isPri?priFC:'2D3748')}},
+          align:isPri||isNum?'center':isAmt?'right':'left',
+          fmt:isAmt?'#,##0.00':null, border:true
+        });
+      });
+      ws.getRow(r).height=15;
+      curRow++;
+    });
+
+    // spacer
+    ws.getRow(curRow).height=4;
+    curRow++;
+  }
+
+  // Grand total
+  merge(ws,curRow,1,curRow,6);
+  cell(ws,curRow,1,`GRAND TOTAL  —  ${rowNum} lines  |  ${data.brandTotals.length} Brands`,
+    {font:{bold:true,size:9,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'right'});
+  cell(ws,curRow,7,data.totalQty,{font:{bold:true,size:10,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'center'});
+  cell(ws,curRow,9,Math.round(data.totalAmt*100)/100,{font:{bold:true,size:10,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'right',fmt:'#,##0.00'});
+  ws.getRow(curRow).height=20;
+
+  // ── Sheet 2: Brand Summary ──
+  const ws2=wb.addWorksheet('Brand Summary');
+  ws2.views=[{showGridLines:false,state:'frozen',ySplit:3}];
+  merge(ws2,1,1,1,7);
+  cell(ws2,1,1,`Brand Performance – ${period}`,{font:{bold:true,size:13,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'center'});
+  ws2.getRow(1).height=26;
+  ws2.getRow(2).height=5;
+  ['#','Brand','Total Qty','SKUs','Revenue (₹)','% Qty','% Rev'].forEach((h,i)=>{
+    cell(ws2,3,i+1,h,{font:{bold:true,size:9,color:{argb:'FF'+HDR_FC}},fill:HDR_BG,align:'center'});
+  });
+  [4,20,12,10,16,10,10].forEach((w,i)=>ws2.getColumn(i+1).width=w);
+  ws2.getRow(3).height=18;
+
+  data.brandTotals.forEach((bt,idx)=>{
+    const r=idx+4, bg=idx%2===0?ALT:WHITE;
+    [idx+1,bt.brand,bt.totalQty,bt.items.length,
+      Math.round(bt.totalAmt*100)/100,
+      Math.round(bt.totalQty/data.totalQty*1000)/10,
+      Math.round(bt.totalAmt/data.totalAmt*1000)/10
+    ].forEach((v,ci)=>{
+      cell(ws2,r,ci+1,v,{fill:bg,font:{size:9,color:{argb:'FF2D3748'}},
+        align:[0,2,3,5,6].includes(ci)?'center':ci===4?'right':'left',
+        fmt:ci===4?'#,##0.00':ci>=5?'0.0"%"':null,border:true});
+    });
+    ws2.getRow(r).height=15;
+  });
+
+  const buf = await wb.xlsx.writeBuffer();
+  return new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+
+// ── RENDER RESULTS ─────────────────────────────────────────────────────
+function renderResults(data, xlsBlob) {
+  const period = document.getElementById('cyclePeriod').value;
+  const url = URL.createObjectURL(xlsBlob);
+
+  let previewHtml = `
+    <div class="results-wrap">
+      <div class="section-title">Cycle Summary</div>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-val">${data.totalQty}</div><div class="stat-label">PAIRS SOLD</div></div>
+        <div class="stat-card"><div class="stat-val">₹${Math.round(data.totalAmt).toLocaleString('en-IN')}</div><div class="stat-label">REVENUE</div></div>
+        <div class="stat-card"><div class="stat-val">${data.brandTotals.length}</div><div class="stat-label">BRANDS</div></div>
+        <div class="stat-card"><div class="stat-val">${data.skuCount}</div><div class="stat-label">SKUs</div></div>
+        <div class="stat-card"><div class="stat-val">₹${Math.round(data.totalDisc).toLocaleString('en-IN')}</div><div class="stat-label">DISCOUNT GIVEN</div></div>
+      </div>
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:24px">
+        <a class="download-btn" href="${url}" download="SR_Shoes_Reorder_${period.replace(/ /g,'_')}.xlsx">⬇ Download Excel</a>
+        <button class="save-btn" id="saveBtn" onclick="saveCycle(this)">💾 Save to History</button>
+      </div>
+      <div class="section-title">Brand Preview (top 6 brands)</div>
+      <div class="brand-table-wrap">
+        <table class="brand-table">
+          <thead><tr><th>#</th><th>Brand</th><th>Category</th><th>Item</th><th>Color</th><th>Sizes</th><th>Qty</th><th>Priority</th></tr></thead>
+          <tbody>`;
+
+  let rowNum = 0;
+  for (const bt of data.brandTotals.slice(0, 6)) {
+    previewHtml += `<tr class="brand-row-header"><td colspan="8">🏷 ${bt.brand.toUpperCase()} — ${bt.totalQty} pairs | ${bt.skuCount} SKUs | ₹${Math.round(bt.totalAmt).toLocaleString('en-IN')}</td></tr>`;
+    for (const item of bt.items.slice(0, 4)) {
+      rowNum++;
+      const pri = priority(item.qty);
+      const sizes = [...new Set(item.sizes)].sort().join(', ') || '—';
+      const colorVal = item.color || '—';
+      previewHtml += `<tr>
+        <td style="color:var(--muted2);font-family:var(--font-mono);font-size:11px">${rowNum}</td>
+        <td></td>
+        <td style="color:var(--muted);font-size:12px">${item.group}</td>
+        <td>${item.base}</td>
+        <td style="font-family:var(--font-mono);font-size:12px;color:#818cf8;background:rgba(129,140,248,.08);padding:3px 8px;border-radius:4px">${colorVal}</td>
+        <td style="font-family:var(--font-mono);font-size:12px;color:var(--muted)">${sizes}</td>
+        <td style="text-align:center;font-weight:600">${item.qty}</td>
+        <td><span class="pill pill-${pri.toLowerCase()}">${pri}</span></td>
+      </tr>`;
+    }
+    if (bt.items.length > 4) {
+      previewHtml += `<tr><td colspan="8" style="color:var(--muted2);font-size:11px;font-family:var(--font-mono);padding:6px 14px">+ ${bt.items.length-4} more color variants → see Excel</td></tr>`;
+    }
+  }
+  if (data.brandTotals.length > 6) {
+    previewHtml += `<tr><td colspan="8" style="color:var(--muted2);font-size:12px;font-family:var(--font-mono);padding:10px 14px">+ ${data.brandTotals.length-6} more brands in Excel</td></tr>`;
+  }
+  previewHtml += `</tbody></table></div></div>`;
+  document.getElementById('resultsArea').innerHTML = previewHtml;
+
+  // store blob ref for save
+  window._lastBlob = xlsBlob;
+  window._lastPeriod = period;
+}
+
+// ── FIREBASE ───────────────────────────────────────────────────────────
+async function saveCycle(btn) {
+  if (!window._firebaseReady) { toast('Firebase not connected yet','error'); return; }
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  const period = document.getElementById('cyclePeriod').value;
+  const cycleType = document.getElementById('cycleType').value;
+  const data = parsedData;
+
+  // Compress: store brand totals summary (not every row)
+  const summary = {
+    period,
+    cycleType,
+    savedAt: new Date().toISOString(),
+    totalQty: data.totalQty,
+    totalAmt: data.totalAmt,
+    totalDisc: data.totalDisc,
+    skuCount: data.skuCount,
+    brandCount: data.brandTotals.length,
+    brandTotals: data.brandTotals.map(bt=>({
+      brand: bt.brand,
+      totalQty: bt.totalQty,
+      totalAmt: bt.totalAmt,
+      skuCount: bt.items.length,
+      items: bt.items.map(it=>({
+        base: it.base,
+        group: it.group,
+        qty: it.qty,
+        amount: it.amount,
+        sizes: it.sizes
+      }))
+    }))
+  };
+
+  try {
+    const db = window._db;
+    await window._fbAddDoc(window._fbCollection(db,'srshoes_reorder_cycles'), summary);
+    btn.style.display='none';
+    document.querySelector('.save-btn')?.insertAdjacentHTML('afterend','<span class="saved-badge">✅ Saved to History</span>');
+    cycles.push(summary);
+    toast('Cycle saved to history ✓','success');
+  } catch(e) {
+    console.error(e);
+    toast('Save failed – check Firebase config','error');
+    btn.disabled=false;
+    btn.textContent='💾 Save to History';
+  }
+}
+
+async function loadCycles() {
+  if (!window._firebaseReady) {
+    window.addEventListener('firebaseReady', loadCycles, {once:true});
+    return;
+  }
+  try {
+    const db = window._db;
+    const q = window._fbQuery(window._fbCollection(db,'srshoes_reorder_cycles'), window._fbOrderBy('savedAt','desc'));
+    const snap = await window._fbGetDocs(q);
+    cycles = snap.docs.map(d=>d.data());
+  } catch(e) {
+    console.error('Load cycles error:',e);
+  }
+}
+
+// ── HISTORY ────────────────────────────────────────────────────────────
+function renderHistory() {
+  if (!cycles.length) return;
+  let html = '<div class="history-grid">';
+  for (const c of cycles) {
+    html += `
+    <div class="history-card" onclick="openCycleModal(${JSON.stringify(c).replace(/"/g,'&quot;')})">
+      <div class="hc-date">${new Date(c.savedAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>
+      <div class="hc-label">${c.period} <span style="font-size:12px;color:var(--muted);font-weight:400">(${c.cycleType})</span></div>
+      <div class="hc-stats">
+        <div class="hc-stat">Pairs <span>${c.totalQty}</span></div>
+        <div class="hc-stat">Revenue <span>₹${Math.round(c.totalAmt).toLocaleString('en-IN')}</span></div>
+        <div class="hc-stat">Brands <span>${c.brandCount}</span></div>
+        <div class="hc-stat">SKUs <span>${c.skuCount}</span></div>
+      </div>
+    </div>`;
+  }
+  html += '</div>';
+  document.getElementById('historyContent').innerHTML = html;
+}
+
+function openCycleModal(c) {
+  document.getElementById('modalTitle').textContent = `${c.period} — ${c.cycleType}`;
+  let body = `
+    <div class="stats-row" style="margin-bottom:20px">
+      <div class="stat-card"><div class="stat-val">${c.totalQty}</div><div class="stat-label">PAIRS SOLD</div></div>
+      <div class="stat-card"><div class="stat-val">₹${Math.round(c.totalAmt).toLocaleString('en-IN')}</div><div class="stat-label">REVENUE</div></div>
+      <div class="stat-card"><div class="stat-val">${c.brandCount}</div><div class="stat-label">BRANDS</div></div>
+    </div>
+    <div class="brand-table-wrap">
+    <table class="brand-table">
+      <thead><tr><th>Brand</th><th>Qty</th><th>SKUs</th><th>Revenue</th></tr></thead><tbody>`;
+  for (const bt of c.brandTotals) {
+    body += `<tr><td style="font-weight:600">${bt.brand}</td><td style="text-align:center">${bt.totalQty}</td><td style="text-align:center">${bt.skuCount}</td><td style="text-align:right;font-family:var(--font-mono)">₹${Math.round(bt.totalAmt).toLocaleString('en-IN')}</td></tr>`;
+  }
+  body += '</tbody></table></div>';
+  document.getElementById('modalBody').innerHTML = body;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); }
+
+// ── TRENDS ─────────────────────────────────────────────────────────────
+function renderTrends() {
+  if (cycles.length < 2) return;
+
+  // 1. Repeat items (appear in 2+ cycles)
+  const itemCycles = {};
+  for (const c of cycles) {
+    const seen = new Set();
+    for (const bt of (c.brandTotals||[])) {
+      for (const it of (bt.items||[])) {
+        const key = it.base + '|' + bt.brand;
+        if (!seen.has(key)) {
+          seen.add(key);
+          if (!itemCycles[key]) itemCycles[key] = {name:it.base, brand:bt.brand, count:0, totalQty:0};
+          itemCycles[key].count++;
+          itemCycles[key].totalQty += it.qty;
+        }
+      }
+    }
+  }
+  const repeats = Object.values(itemCycles).filter(x=>x.count>=2).sort((a,b)=>b.count-a.count).slice(0,12);
+
+  // 2. Cycle totals
+  const maxQty = Math.max(...cycles.map(c=>c.totalQty));
+
+  // 3. Brand trend
+  const brandCycles = {};
+  for (const c of cycles) {
+    for (const bt of (c.brandTotals||[])) {
+      if (!brandCycles[bt.brand]) brandCycles[bt.brand] = {count:0, totalQty:0};
+      brandCycles[bt.brand].count++;
+      brandCycles[bt.brand].totalQty += bt.totalQty;
+    }
+  }
+  const topBrands = Object.entries(brandCycles).sort((a,b)=>b[1].count-a[1].count).slice(0,8);
+
+  let html = `<div class="trends-grid">
+    <div class="trend-card">
+      <div class="trend-card-title">🔁 Repeat Reorder Items</div>
+      ${repeats.length ? repeats.map(r=>`
+        <div class="repeat-item">
+          <div><div class="repeat-name">${r.name}</div><div class="repeat-brand">${r.brand}</div></div>
+          <div class="repeat-count">${r.count}/${cycles.length} cycles</div>
+        </div>`).join('') : '<div style="color:var(--muted);font-size:13px">No repeats yet</div>'}
+    </div>
+    <div class="trend-card">
+      <div class="trend-card-title">📦 Qty per Cycle</div>
+      ${[...cycles].reverse().map(c=>`
+        <div class="cycle-bar-wrap">
+          <div class="cycle-bar-label"><span>${c.period}</span><span>${c.totalQty} pairs</span></div>
+          <div class="cycle-bar-bg"><div class="cycle-bar-fill" style="width:${Math.round(c.totalQty/maxQty*100)}%"></div></div>
+        </div>`).join('')}
+    </div>
+    <div class="trend-card">
+      <div class="trend-card-title">🏷 Brand Consistency</div>
+      ${topBrands.map(([brand,d])=>`
+        <div class="brand-trend-row">
+          <div class="bt-name">${brand}</div>
+          <div class="bt-cycles">${d.count}/${cycles.length} cycles</div>
+          <div class="bt-bar-bg"><div class="bt-bar-fill" style="width:${Math.round(d.count/cycles.length*100)}%"></div></div>
+        </div>`).join('')}
+    </div>
+    <div class="trend-card">
+      <div class="trend-card-title">💰 Revenue per Cycle</div>
+      ${[...cycles].reverse().map(c=>`
+        <div class="cycle-bar-wrap">
+          <div class="cycle-bar-label"><span>${c.period}</span><span>₹${Math.round(c.totalAmt).toLocaleString('en-IN')}</span></div>
+          <div class="cycle-bar-bg"><div class="cycle-bar-fill" style="width:${Math.round(c.totalAmt/Math.max(...cycles.map(x=>x.totalAmt))*100)}%"></div></div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+
+  document.getElementById('trendsContent').innerHTML = html;
+}
+
+// ── TOAST ──────────────────────────────────────────────────────────────
+function toast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(()=>t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
