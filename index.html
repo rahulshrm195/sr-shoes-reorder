@@ -1010,6 +1010,111 @@ function setProgress(pct, msg) {
   document.getElementById('progressStatus').textContent = msg;
 }
 
+// ── ORDER EXCEL — only ticked items, supplier-ready ───────────────────
+async function downloadOrderExcel(period) {
+  if (!parsedData || !Object.keys(orderedItems).length) {
+    toast('No items marked as ordered yet','error'); return;
+  }
+
+  const wb  = new ExcelJS.Workbook();
+  const ws  = wb.addWorksheet('Order Sheet');
+  ws.views  = [{showGridLines:false, state:'frozen', ySplit:5}];
+
+  const TITLE_BG='1A202C', HDR_BG='16A34A', BRAND_BG='14532D';
+  const ALT='F0FDF4', WHITE='FFFFFF';
+  const thin = {style:'thin', color:{argb:'FFD1FAE5'}};
+
+  function sc(ws,r,c,v,opts={}) {
+    const cl=ws.getCell(r,c); cl.value=v;
+    cl.font  = opts.font ? {name:'Arial',size:9,...opts.font} : {name:'Arial',size:9};
+    if (opts.fill) cl.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+opts.fill}};
+    cl.alignment={horizontal:opts.align||'left',wrapText:false};
+    if (opts.fmt) cl.numFmt=opts.fmt;
+    if (opts.border) cl.border={left:thin,right:thin,top:thin,bottom:thin};
+  }
+  function spanRow(ws,r,c1,c2,v,opts={}) {
+    sc(ws,r,c1,v,opts);
+    for (let c=c1+1;c<=c2;c++) sc(ws,r,c,'',{fill:opts.fill});
+  }
+
+  // Title
+  spanRow(ws,1,1,7,`SR Shoes — Order Sheet  |  ${period}`,
+    {font:{bold:true,size:13,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'center'});
+  ws.getRow(1).height=28;
+
+  const orderedCount = Object.keys(orderedItems).length;
+  spanRow(ws,2,1,7,`Items to Order: ${orderedCount}  |  Generated: ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}`,
+    {font:{size:9,color:{argb:'FF16A34A'}},fill:'F0FDF4',align:'center'});
+  ws.getRow(2).height=15;
+  ws.getRow(3).height=5;
+
+  // Headers
+  const HDRS=['#','Brand','Category','Item Name','Color','Sizes Sold','Order Type'];
+  const WIDS=[4,18,22,36,18,20,14];
+  HDRS.forEach((h,i)=>{
+    sc(ws,4,i+1,h,{font:{bold:true,size:9,color:{argb:'FF'+WHITE}},fill:HDR_BG,align:'center'});
+  });
+  WIDS.forEach((w,i)=>ws.getColumn(i+1).width=w);
+  ws.getRow(4).height=20;
+  ws.getRow(5).height=4;
+
+  let curRow=6, rowNum=0, currentBrand='';
+
+  // Group ordered items by brand
+  for (const bt of parsedData.brandTotals) {
+    const orderedForBrand = bt.items.filter(item => {
+      const key = `${item.base}||${item.color||''}||${bt.brand}`;
+      return !!orderedItems[key];
+    });
+    if (!orderedForBrand.length) continue;
+
+    // Brand header
+    spanRow(ws,curRow,1,7,`  ${bt.brand.toUpperCase()}`,
+      {font:{bold:true,size:9,color:{argb:'FF'+WHITE}},fill:BRAND_BG});
+    ws.getRow(curRow).height=16;
+    curRow++;
+
+    orderedForBrand.forEach((item,idx)=>{
+      rowNum++;
+      const bg = idx%2===0 ? ALT : WHITE;
+      const isCutsize = brandSettings[bt.brand]==='cutsize';
+      const orderType = isCutsize ? '✂ CUTSIZE' : '📦 FULL SET';
+      const otBG      = isCutsize ? 'EDE9FE' : 'FFF7ED';
+      const otFC      = isCutsize ? '4338CA' : 'C2410C';
+      const sizes     = [...new Set(item.sizes)].sort().join(', ')||'—';
+
+      [rowNum, '', item.group, item.base, item.color||'—', sizes, orderType].forEach((v,ci)=>{
+        const isOT=ci===6;
+        sc(ws,curRow,ci+1,v,{
+          fill: isOT?otBG:bg,
+          font:{bold:isOT,size:9,color:{argb:'FF'+(isOT?otFC:'1A202C')}},
+          align: ci===0||isOT ? 'center' : 'left',
+          border:true
+        });
+      });
+      ws.getRow(curRow).height=16;
+      curRow++;
+    });
+
+    ws.getRow(curRow).height=4; curRow++;
+  }
+
+  // Footer total
+  spanRow(ws,curRow,1,7,`Total: ${rowNum} items to order`,
+    {font:{bold:true,size:9,color:{argb:'FF'+WHITE}},fill:TITLE_BG,align:'center'});
+  ws.getRow(curRow).height=18;
+
+  const buf  = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `SR_Shoes_OrderSheet_${period.replace(/ /g,'_')}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast(`Order Excel downloaded — ${rowNum} items ✓`, 'success');
+}
+
 // ── EXCEL GENERATION ───────────────────────────────────────────────────
 async function generateExcel(data, period, cycleType, brandSettings={}) {
   const wb = new ExcelJS.Workbook();
@@ -1161,11 +1266,12 @@ function renderResults(data, xlsBlob) {
       <div class="stat-card"><div class="stat-val">₹${Math.round(data.totalDisc).toLocaleString('en-IN')}</div><div class="stat-label">DISCOUNT GIVEN</div></div>
     </div>
     <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-      <a class="download-btn" href="${url}" download="SR_Shoes_Reorder_${period.replace(/ /g,'_')}.xlsx">⬇ Download Excel</a>
+      <a class="download-btn" href="${url}" download="SR_Shoes_Reorder_${period.replace(/ /g,'_')}.xlsx">⬇ Full Excel</a>
       <button class="save-btn" id="saveBtn" onclick="saveCycle(this)">💾 Save to History</button>
+      <button class="save-btn" id="orderExcelBtn" onclick="downloadOrderExcel('${period.replace(/ /g,'_')}')" style="border-color:var(--low);color:var(--low);opacity:.4;cursor:not-allowed" disabled>📋 Download Order Excel</button>
     </div>
     <div style="font-size:12px;color:var(--muted2);font-family:var(--font-mono);margin-bottom:20px">
-      Save to history after downloading so next cycle's FULL SET tracking is accurate.
+      Tick items as ordered → Order Excel auto-populates with only those items.
     </div>`;
 
   // ── Checklist ──
@@ -1295,6 +1401,24 @@ function markOrdered(checkbox, orderKey, safeKey) {
     row.style.opacity = '1';
     delete orderedItems[orderKey];
   }
+  updateOrderExcelBtn();
+}
+
+function updateOrderExcelBtn() {
+  const btn = document.getElementById('orderExcelBtn');
+  if (!btn) return;
+  const count = Object.keys(orderedItems).length;
+  if (count > 0) {
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.style.cursor  = 'pointer';
+    btn.textContent   = `📋 Download Order Excel (${count} items)`;
+  } else {
+    btn.disabled = true;
+    btn.style.opacity = '0.4';
+    btn.style.cursor  = 'not-allowed';
+    btn.textContent   = '📋 Download Order Excel';
+  }
 }
 
 function markAllOrdered(brand, btn) {
@@ -1311,6 +1435,7 @@ function markAllOrdered(brand, btn) {
   btn.style.opacity = '0.5';
   btn.disabled = true;
   if (count > 0) toast(`${brand}: ${count} items marked as ordered ✓`, 'success');
+  updateOrderExcelBtn();
 }
 
 async function loadCycles() {
