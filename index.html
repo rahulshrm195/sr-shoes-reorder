@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>SR Shoes – Reorder Tool v2.1.0</title>
+<title>SR Shoes – Reorder Tool v2.1.1</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0f172a"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -380,7 +380,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 <div id="loginScreen">
   <div class="login-card">
     <div class="login-logo">SR Shoes</div>
-    <div class="login-sub">Reorder Management Tool <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted2);margin-left:4px">v2.1.0</span></div>
+    <div class="login-sub">Reorder Management Tool <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted2);margin-left:4px">v2.1.1</span></div>
     <label class="login-label">PASSWORD</label>
     <input type="password" class="login-input" id="loginPass" placeholder="Enter password" autocomplete="current-password"/>
     <button class="login-btn" onclick="doLogin()">Access Tool →</button>
@@ -393,7 +393,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   <div class="topbar">
     <div class="topbar-logo">SR Shoes</div>
     <div class="topbar-sep">|</div>
-    <span style="font-size:13px;color:var(--muted);font-family:var(--font-mono)">Reorder Tool <span style="color:var(--accent2);font-size:11px">v2.1.0</span></span>
+    <span style="font-size:13px;color:var(--muted);font-family:var(--font-mono)">Reorder Tool <span style="color:var(--accent2);font-size:11px">v2.1.1</span></span>
     <div class="nav-tabs">
       <button class="nav-tab active" onclick="showPage('upload',this)">📤 <span>Upload</span></button>
       <button class="nav-tab" onclick="showPage('history',this)">📁 <span>History</span></button>
@@ -469,6 +469,22 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       </div>
       <div style="margin-top:12px;font-size:12px;color:var(--muted2);font-family:var(--font-mono)">
         Settings are saved to Firebase and applied automatically every cycle.
+      </div>
+      <div id="settingsError" style="display:none;margin-top:14px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:var(--radius-sm);padding:16px 20px">
+        <div style="color:#ef4444;font-weight:700;font-size:13px;margin-bottom:8px">⚠ Firestore Permission Error</div>
+        <div style="color:var(--muted);font-size:12px;line-height:1.7">
+          Your Firestore rules are blocking writes. Fix it in 30 seconds:<br/>
+          1. Go to <strong style="color:var(--text)">Firebase Console → Firestore → Rules</strong><br/>
+          2. Replace the rules with this and click <strong style="color:var(--text)">Publish</strong>:
+        </div>
+        <pre style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;margin-top:10px;font-size:11px;color:#86efac;overflow-x:auto">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}</pre>
       </div>
     </div>
   </div>
@@ -597,27 +613,54 @@ async function loadSettings() {
     const snap=await window._fbGetDocs(window._fbCollection(db,'srshoes_brand_settings'));
     snap.forEach(d=>{ brandSettings[d.id]=d.data().orderType||'fullset'; });
   } catch(e){ console.error('loadSettings:',e); }
+  // Always render settings after load so rows exist even before tab is clicked
+  renderSettings();
 }
 
 async function saveSettings() {
   if (!window._firebaseReady) { toast('Firebase not ready','error'); return; }
   const db=window._db;
   const rows=document.querySelectorAll('.brand-setting-row');
-  let saved=0;
-  for (const row of rows) {
+  if (!rows.length) { toast('No brands loaded yet','error'); return; }
+
+  // Collect all current UI state
+  const toSave=[];
+  rows.forEach(row=>{
     const brand=row.dataset.brand;
     const ot=row.querySelector('.toggle-btn.active.cutsize')?'cutsize':'fullset';
+    toSave.push({brand,ot});
+  });
+
+  let saved=0, lastErr='';
+  for (const {brand,ot} of toSave) {
     brandSettings[brand]=ot;
     try {
-      // setDoc with brand as doc ID — always overwrites, no duplicates
       await window._fbSetDoc(
         window._fbDoc(db,'srshoes_brand_settings', brand),
         {brand, orderType:ot, updatedAt:new Date().toISOString()}
       );
       saved++;
-    } catch(e){ console.error(e); }
+    } catch(e){
+      lastErr=e.code||e.message||String(e);
+      console.error('saveSettings error for',brand,':',e);
+      // don't break — try saving remaining brands
+    }
   }
-  toast(`Settings saved for ${saved} brands ✓`,'success');
+
+  if (toSave.length===0) {
+    toast('No brands found — open Settings tab first','error');
+  } else if (saved===toSave.length) {
+    toast(`✓ All ${saved} brand settings saved`,'success');
+  } else if (saved>0) {
+    toast(`Partial: ${saved}/${toSave.length} saved. Error: ${lastErr}`,'error');
+  } else {
+    if (lastErr.includes('permission')||lastErr.includes('PERMISSION_DENIED')) {
+      toast('Firestore rules blocking write — see fix in Settings tab','error');
+      document.getElementById('settingsError').style.display='block';
+    } else {
+      toast(`Save failed: ${lastErr}`,'error');
+    }
+  }
 }
 
 function renderSettings() {
