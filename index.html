@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>SR Shoes – Reorder Tool v2.3.0</title>
+<title>SR Shoes – Reorder Tool v2.4.0</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0f172a"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -407,6 +407,49 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 .ready-waiting{background:rgba(100,116,139,.15);color:var(--muted2)}
 .checklist-actions{display:flex;gap:10px;margin-top:16px;max-width:960px}
 
+/* ── Orders ── */
+.po-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);margin-bottom:16px;overflow:hidden;
+}
+.po-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;background:var(--surface2);border-bottom:1px solid var(--border);
+  flex-wrap:wrap;gap:8px;
+}
+.po-title{font-family:var(--font-head);font-size:15px;font-weight:700}
+.po-meta{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.po-brand-block{padding:0}
+.po-brand-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 18px;border-bottom:1px solid rgba(51,65,85,.3);
+  background:rgba(249,115,22,.05);
+}
+.po-brand-name{font-size:13px;font-weight:700;color:var(--accent);font-family:var(--font-head)}
+.po-brand-count{font-size:11px;color:var(--muted);font-family:var(--font-mono)}
+.po-share-btn{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);
+  color:#25D366;font-size:11px;font-weight:700;font-family:var(--font-mono);
+  padding:4px 12px;border-radius:6px;cursor:pointer;transition:all .2s;
+  white-space:nowrap;
+}
+.po-share-btn:hover{background:rgba(37,211,102,.2)}
+.po-item-row{
+  display:flex;align-items:center;gap:12px;
+  padding:8px 18px;border-bottom:1px solid rgba(51,65,85,.2);font-size:13px;
+}
+.po-item-row:last-child{border-bottom:none}
+.po-item-name{flex:1}
+.po-item-color{font-family:var(--font-mono);font-size:11px;color:#818cf8;background:rgba(129,140,248,.1);padding:2px 8px;border-radius:4px}
+.po-item-sizes{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+.po-ref-note{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);
+  border-radius:6px;padding:8px 14px;font-size:12px;color:#a5b4fc;
+  font-family:var(--font-mono);margin-bottom:12px;
+}
+
 @media(max-width:600px){
   .topbar{padding:0 16px}
   .page{padding:16px 16px 60px}
@@ -421,7 +464,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 <div id="loginScreen">
   <div class="login-card">
     <div class="login-logo">SR Shoes</div>
-    <div class="login-sub">Reorder Management Tool <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted2);margin-left:4px">v2.3.0</span></div>
+    <div class="login-sub">Reorder Management Tool <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted2);margin-left:4px">v2.4.0</span></div>
     <label class="login-label">PASSWORD</label>
     <input type="password" class="login-input" id="loginPass" placeholder="Enter password" autocomplete="current-password"/>
     <button class="login-btn" onclick="doLogin()">Access Tool →</button>
@@ -434,11 +477,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   <div class="topbar">
     <div class="topbar-logo">SR Shoes</div>
     <div class="topbar-sep">|</div>
-    <span style="font-size:13px;color:var(--muted);font-family:var(--font-mono)">Reorder Tool <span style="color:var(--accent2);font-size:11px">v2.3.0</span></span>
+    <span style="font-size:13px;color:var(--muted);font-family:var(--font-mono)">Reorder Tool <span style="color:var(--accent2);font-size:11px">v2.4.0</span></span>
     <div class="nav-tabs">
       <button class="nav-tab active" onclick="showPage('upload',this)">📤 <span>Upload</span></button>
       <button class="nav-tab" onclick="showPage('history',this)">📁 <span>History</span></button>
       <button class="nav-tab" onclick="showPage('trends',this)">📈 <span>Trends</span></button>
+      <button class="nav-tab" onclick="showPage('orders',this)">🛍 <span>Orders</span></button>
       <button class="nav-tab" onclick="showPage('settings',this)">⚙️ <span>Settings</span></button>
     </div>
     <button class="logout-btn" onclick="doLogout()">Logout</button>
@@ -495,6 +539,20 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
     <div id="trendsContent"><div class="empty-state"><div class="empty-icon">📈</div><div class="empty-title">Not enough data yet</div><div>Save at least 2 cycles to see trends.</div></div></div>
   </div>
 </div>
+
+  <!-- Orders Page -->
+  <div class="page" id="page-orders">
+    <div style="max-width:860px;margin:0 auto">
+      <div class="section-title">Purchase Orders</div>
+      <div id="ordersContent">
+        <div class="empty-state">
+          <div class="empty-icon">🛍</div>
+          <div class="empty-title">No orders yet</div>
+          <div>Orders are created automatically when you Finalise a cycle.</div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Settings Page -->
   <div class="page" id="page-settings">
@@ -668,7 +726,8 @@ let currentFile      = null;
 let cycles           = [];
 let brandSettings    = {};
 let orderedItems     = {};
-let discoveredBrands = new Set(); // grows with every XLS upload
+let discoveredBrands = new Set();
+let purchaseOrders   = []; // loaded from Firebase
 
 // ── FILE HANDLING ──────────────────────────────────────────────────────
 function handleFile(file) {
@@ -916,13 +975,20 @@ async function masterReset() {
       await window._fbDeleteDoc(window._fbDoc(db,'srshoes_brand_settings', d.id));
       deleted++;
     }
+    // Delete all purchase orders
+    const poSnap = await window._fbGetDocs(window._fbCollection(db,'srshoes_purchase_orders'));
+    for (const d of poSnap.docs) {
+      await window._fbDeleteDoc(window._fbDoc(db,'srshoes_purchase_orders', d.id));
+      deleted++;
+    }
 
     // Reset local state
-    cycles        = [];
-    brandSettings = {};
-    orderedItems  = {};
-    parsedData    = null;
-    currentFile   = null;
+    cycles           = [];
+    brandSettings    = {};
+    orderedItems     = {};
+    parsedData       = null;
+    currentFile      = null;
+    purchaseOrders   = [];
 
     // Reset UI
     document.getElementById('resultsArea').innerHTML = '';
@@ -988,6 +1054,7 @@ function doLogin() {
     document.getElementById('app').style.display = 'block';
     loadCycles();
     loadSettings();
+    loadOrders();
   } else {
     document.getElementById('loginErr').style.display = 'block';
   }
@@ -1006,6 +1073,7 @@ function showPage(id, btn) {
   btn.classList.add('active');
   if (id === 'history') renderHistory();
   if (id === 'trends') renderTrends();
+  if (id === 'orders') renderOrders();
   if (id === 'settings') renderSettings();
 }
 
@@ -1042,9 +1110,12 @@ async function downloadOrderAndSave(btn, period) {
     // 2. Save cycle to Firebase
     await saveCycleData();
 
+    // 3. Create Purchase Order
+    await createPurchaseOrder(period.replace(/_/g,' '));
+
     btn.textContent = '✅ Done — Saved & Downloaded';
     btn.style.opacity = '0.6';
-    toast('Order downloaded + cycle saved to history ✓','success');
+    toast('Order downloaded + cycle saved + PO created ✓','success');
   } catch(e) {
     console.error(e);
     btn.disabled = false;
@@ -1354,7 +1425,9 @@ function renderResults(data, xlsBlob) {
     </div>`;
 
   // ── Checklist ──
+  const poRef = getLastPOReference();
   html += `<div class="section-title">✅ Order Checklist — tick when ordered</div>
+    ${poRef ? `<div class="po-ref-note">ℹ️ ${poRef}</div>` : ''}
     <div class="checklist-wrap">`;
 
   for (const bt of data.brandTotals) {
@@ -1523,7 +1596,108 @@ async function loadCycles() {
   }
 }
 
-// ── HISTORY ────────────────────────────────────────────────────────────
+// ── ORDERS ────────────────────────────────────────────────────────────
+async function loadOrders() {
+  if (!window._firebaseReady) { window.addEventListener('firebaseReady',loadOrders,{once:true}); return; }
+  try {
+    const db  = window._db;
+    const q   = window._fbQuery(window._fbCollection(db,'srshoes_purchase_orders'), window._fbOrderBy('createdAt','desc'));
+    const snap = await window._fbGetDocs(q);
+    purchaseOrders = snap.docs.map(d=>({id:d.id,...d.data()}));
+  } catch(e){ console.error('loadOrders:',e); }
+}
+
+async function createPurchaseOrder(period) {
+  // Group ticked items by brand
+  if (!parsedData || !Object.keys(orderedItems).length) return;
+  const brandGroups = {};
+  for (const bt of parsedData.brandTotals) {
+    const items = bt.items.filter(item => {
+      const key = `${item.base}||${item.color||''}||${bt.brand}`;
+      return !!orderedItems[key];
+    });
+    if (items.length) {
+      brandGroups[bt.brand] = items.map(item => ({
+        base: item.base,
+        color: item.color||'',
+        sizes: [...new Set(item.sizes)].sort(),
+        orderType: brandSettings[bt.brand]==='cutsize' ? 'CUTSIZE' : 'FULL SET'
+      }));
+    }
+  }
+  const po = {
+    period,
+    createdAt: new Date().toISOString(),
+    totalItems: Object.keys(orderedItems).length,
+    brandGroups
+  };
+  try {
+    const db  = window._db;
+    const ref = await window._fbAddDoc(window._fbCollection(db,'srshoes_purchase_orders'), po);
+    purchaseOrders.unshift({id:ref.id, ...po});
+  } catch(e){ console.error('createPO error:',e); }
+}
+
+function renderOrders() {
+  const el = document.getElementById('ordersContent');
+  if (!purchaseOrders.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🛍</div><div class="empty-title">No orders yet</div><div>Orders are created automatically when you Finalise a cycle.</div></div>`;
+    return;
+  }
+  el.innerHTML = purchaseOrders.map(po => {
+    const date = new Date(po.createdAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+    const brands = Object.entries(po.brandGroups||{});
+    return `<div class="po-card">
+      <div class="po-header">
+        <div>
+          <div class="po-title">🛍 PO — ${po.period}</div>
+          <div class="po-meta">${date} &nbsp;·&nbsp; ${po.totalItems} items &nbsp;·&nbsp; ${brands.length} brands</div>
+        </div>
+      </div>
+      <div class="po-brand-block">
+        ${brands.map(([brand, items]) => `
+          <div class="po-brand-header">
+            <div>
+              <div class="po-brand-name">${brand}</div>
+              <div class="po-brand-count">${items.length} item${items.length>1?'s':''}</div>
+            </div>
+            <button class="po-share-btn" onclick="shareOnWhatsApp('${brand.replace(/'/g,"\\'")}',${JSON.stringify(items).replace(/'/g,"\\'")},'${po.period}')">
+              📱 WhatsApp
+            </button>
+          </div>
+          ${items.map(item=>`
+            <div class="po-item-row">
+              <div class="po-item-name">${item.base}</div>
+              <span class="po-item-color">${item.color||'—'}</span>
+              <span class="po-item-sizes">Sizes: ${item.sizes.join(', ')||'—'}</span>
+              <span style="font-size:10px;font-family:var(--font-mono);color:var(--muted2)">${item.orderType}</span>
+            </div>`).join('')}
+        `).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function shareOnWhatsApp(brand, items, period) {
+  let msg = `🛍 *SR Shoes — Purchase Order*\n📅 ${period}\n\n`;
+  msg += `*${brand}*\n`;
+  items.forEach(item => {
+    msg += `• ${item.base}`;
+    if (item.color) msg += ` (${item.color})`;
+    if (item.sizes.length) msg += ` — Sizes: ${item.sizes.join(', ')}`;
+    msg += '\n';
+  });
+  msg += `\n_SR Shoes, Bhiwandi_`;
+  const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+  window.open(url, '_blank');
+}
+
+function getLastPOReference() {
+  if (!purchaseOrders.length) return null;
+  const last = purchaseOrders[0];
+  const date = new Date(last.createdAt).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  return `📋 Last order placed: ${last.period} (${date}) — ${last.totalItems} items. Check GRN for delivery status.`;
+}
 function renderHistory() {
   if (!cycles.length) return;
   let html = '<div class="history-grid">';
