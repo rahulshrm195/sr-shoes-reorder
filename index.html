@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>SR Shoes – Reorder Tool v2.2.0</title>
+<title>SR Shoes – Reorder Tool v2.3.0</title>
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#0f172a"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -420,7 +420,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
 <div id="loginScreen">
   <div class="login-card">
     <div class="login-logo">SR Shoes</div>
-    <div class="login-sub">Reorder Management Tool <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted2);margin-left:4px">v2.2.0</span></div>
+    <div class="login-sub">Reorder Management Tool <span style="font-family:var(--font-mono);font-size:11px;color:var(--muted2);margin-left:4px">v2.3.0</span></div>
     <label class="login-label">PASSWORD</label>
     <input type="password" class="login-input" id="loginPass" placeholder="Enter password" autocomplete="current-password"/>
     <button class="login-btn" onclick="doLogin()">Access Tool →</button>
@@ -433,7 +433,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   <div class="topbar">
     <div class="topbar-logo">SR Shoes</div>
     <div class="topbar-sep">|</div>
-    <span style="font-size:13px;color:var(--muted);font-family:var(--font-mono)">Reorder Tool <span style="color:var(--accent2);font-size:11px">v2.2.0</span></span>
+    <span style="font-size:13px;color:var(--muted);font-family:var(--font-mono)">Reorder Tool <span style="color:var(--accent2);font-size:11px">v2.3.0</span></span>
     <div class="nav-tabs">
       <button class="nav-tab active" onclick="showPage('upload',this)">📤 <span>Upload</span></button>
       <button class="nav-tab" onclick="showPage('history',this)">📁 <span>History</span></button>
@@ -447,29 +447,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
   <div class="page active" id="page-upload">
 
     <!-- Date range hint from last cycle -->
-    <div id="dateRangeHint" style="display:none;max-width:860px;margin:0 auto 20px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);border-radius:var(--radius-sm);padding:12px 18px;font-size:13px;color:#a5b4fc;font-family:var(--font-mono)"></div>
+    <div id="dateRangeHint" style="display:none;max-width:620px;margin:0 auto 20px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);border-radius:var(--radius-sm);padding:12px 18px;font-size:13px;color:#a5b4fc;font-family:var(--font-mono)"></div>
 
-    <!-- Two upload zones side by side -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:860px;margin:0 auto">
-
-      <!-- Sales report -->
-      <div class="upload-zone" id="dropZone1">
-        <input type="file" class="upload-input" id="fileInput1" accept=".xls,.xlsx" onchange="handleSalesFile(this.files[0])"/>
-        <div class="upload-icon">📊</div>
-        <div class="upload-title" style="font-size:16px">Party-wise Sales</div>
-        <div class="upload-hint">Reports → Party-wise Summary<br/>All Parties → Export XLS</div>
-      </div>
-
-      <!-- Inventory report -->
-      <div class="upload-zone" id="dropZone2">
-        <input type="file" class="upload-input" id="fileInput2" accept=".xls,.xlsx" onchange="handleInventoryFile(this.files[0])"/>
-        <div class="upload-icon">📦</div>
-        <div class="upload-title" style="font-size:16px">Inventory List</div>
-        <div class="upload-hint">Reports → Inventory List<br/>All Items → Export XLS</div>
-      </div>
+    <!-- Single upload zone -->
+    <div class="upload-zone" id="dropZone">
+      <input type="file" class="upload-input" id="fileInput" accept=".xls,.xlsx" onchange="handleFile(this.files[0])"/>
+      <div class="upload-icon">📊</div>
+      <div class="upload-title">Drop your Party-wise Summary XLS</div>
+      <div class="upload-hint">Reports → Party-wise Summary → All Parties → Export XLS<br/>Supports .xls and .xlsx  |  Color data included automatically</div>
     </div>
 
-    <!-- Cycle meta — shown after both files loaded -->
     <div class="cycle-meta" id="cycleMeta">
       <div class="meta-field">
         <div class="meta-label">CYCLE PERIOD</div>
@@ -484,13 +471,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
           <option>Custom</option>
         </select>
       </div>
-      <button class="process-btn" id="processBtn" onclick="processFiles()">Generate Report →</button>
-    </div>
-
-    <!-- File status indicators -->
-    <div id="fileStatus" style="max-width:860px;margin:10px auto 0;display:none;gap:12px;flex-wrap:wrap">
-      <div id="salesStatus" class="file-status-badge"></div>
-      <div id="invStatus" class="file-status-badge"></div>
+      <button class="process-btn" id="processBtn" onclick="processFile()">Generate Report →</button>
     </div>
 
     <div class="progress-wrap" id="progressWrap">
@@ -665,87 +646,168 @@ function priority(qty) {
 
 // ── STATE ─────────────────────────────────────────────────────────────
 let parsedData    = null;
-let salesFile     = null;   // Party-wise Sales XLS
-let inventoryFile = null;   // Inventory List XLS
-let inventoryMap  = {};     // key: base||color → [{size, stock}]
-let currentFile   = null;   // legacy alias
+let currentFile   = null;
 let cycles        = [];
 let brandSettings = {};
-let orderedItems  = {};     // key: base||color||brand → {orderedAt, cycleId}
+let orderedItems  = {};  // key: base||color||brand → {orderedAt}
 
 // ── FILE HANDLING ──────────────────────────────────────────────────────
-function handleSalesFile(file) {
+function handleFile(file) {
   if (!file) return;
-  salesFile = file;
-  const dz = document.getElementById('dropZone1');
+  currentFile = file;
+  const dm = file.name.match(/(\d{1,2}[-_]\w+[-_]\d{4}|\d{4}[-_]\d{2}[-_]\d{2})/);
+  if (dm) document.getElementById('cyclePeriod').value = dm[0].replace(/[-_]/g,' ');
+  else document.getElementById('cyclePeriod').value = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  const dz = document.getElementById('dropZone');
   dz.querySelector('.upload-title').textContent = '✅ ' + file.name;
-  dz.querySelector('.upload-hint').textContent = 'Sales file loaded';
+  dz.querySelector('.upload-hint').textContent = 'File loaded. Fill details below and click Generate.';
   dz.style.borderColor = 'var(--low)';
-  checkBothFilesLoaded();
+  document.getElementById('cycleMeta').style.display = 'flex';
 }
 
-function handleInventoryFile(file) {
-  if (!file) return;
-  inventoryFile = file;
-  const dz = document.getElementById('dropZone2');
-  dz.querySelector('.upload-title').textContent = '✅ ' + file.name;
-  dz.querySelector('.upload-hint').textContent = 'Inventory file loaded';
-  dz.style.borderColor = 'var(--low)';
-  checkBothFilesLoaded();
-}
-
-function checkBothFilesLoaded() {
-  const fs = document.getElementById('fileStatus');
-  fs.style.display = 'flex';
-  const s1 = document.getElementById('salesStatus');
-  const s2 = document.getElementById('invStatus');
-  s1.className = 'file-status-badge ' + (salesFile?'loaded':'missing');
-  s1.textContent = salesFile ? '✓ Sales: '+salesFile.name : '✗ Sales file missing';
-  s2.className = 'file-status-badge ' + (inventoryFile?'loaded':'missing');
-  s2.textContent = inventoryFile ? '✓ Inventory: '+inventoryFile.name : '✗ Inventory file missing';
-
-  if (salesFile && inventoryFile) {
-    // Auto-fill period from sales filename
-    const dm = salesFile.name.match(/(\d{1,2}[-_]\w+[-_]\d{4}|\d{4}[-_]\d{2}[-_]\d{2})/);
-    if (dm) document.getElementById('cyclePeriod').value = dm[0].replace(/[-_]/g,' ');
-    else document.getElementById('cyclePeriod').value = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-    document.getElementById('cycleMeta').style.display = 'flex';
+// ── HISTORY SIZES: cumulative sizes sold per item across past cycles ───
+function buildHistorySizes() {
+  // Returns map: base||color||brand → Set of sizes sold in past cycles
+  const histMap = {};
+  for (const c of cycles) {
+    for (const bt of (c.brandTotals||[])) {
+      for (const it of (bt.items||[])) {
+        const key = `${it.base}||${it.color||''}||${bt.brand}`;
+        if (!histMap[key]) histMap[key] = new Set();
+        (it.sizes||[]).forEach(s => histMap[key].add(s));
+      }
+    }
   }
+  return histMap;
 }
 
-// ── INVENTORY PARSER ───────────────────────────────────────────────────
-async function parseInventory(file) {
-  const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, {type:'array'});
-  const ws = wb.Sheets[wb.SheetNames[0]];
+// ── PARSE & PROCESS ────────────────────────────────────────────────────
+async function processFile() {
+  if (!currentFile) return;
+  setProgress(10, 'Reading file...');
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('processBtn').disabled = true;
+
+  const buf = await currentFile.arrayBuffer();
+  const wb  = XLSX.read(buf, {type:'array'});
+  const ws  = wb.Sheets[wb.SheetNames[0]];
   const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
 
-  // Find header row — Inventory has: Code | Group | SubGroup | Name | Desc | Stock
+  setProgress(25, 'Parsing rows...');
+
+  // Find header row
   let headerRow = -1;
   for (let i = 0; i < Math.min(raw.length, 10); i++) {
     const r = raw[i].map(c=>String(c).trim().toLowerCase());
-    if (r.includes('code') && r.includes('name') && r.includes('stock')) { headerRow=i; break; }
+    if (r.includes('invgroup')||r.includes('inventoryname')||(r.includes('partyname')&&r.includes('qty'))) { headerRow=i; break; }
   }
   if (headerRow < 0) headerRow = 5;
 
-  const map = {}; // base||color → [{size, stock, group, code}]
+  const rows = [];
   for (let i = headerRow+1; i < raw.length; i++) {
-    const r = raw[i];
-    const code  = String(r[1]||'').trim();
-    const group = String(r[2]||'').trim();
-    const name  = String(r[4]||'').trim();
-    const desc  = String(r[5]||'').trim();
-    const stock = parseFloat(r[6]);
-    if (!name || !code || isNaN(stock)) continue;
-    if (name.toLowerCase().includes('total') || group.toLowerCase().includes('total')) continue;
-
-    const base = stripSize(name);
-    const {color, size} = parseColorSize(desc);
-    const key = `${base}||${color}`;
-    if (!map[key]) map[key] = [];
-    map[key].push({size, stock, group, code, name});
+    const r       = raw[i];
+    const invName = String(r[2]||'').trim();
+    const colSize = String(r[3]||'').trim();
+    if (!invName || invName==='InventoryName' || invName.toLowerCase().startsWith('total')) continue;
+    const qty = parseFloat(r[5]);
+    if (isNaN(qty)||qty<=0) continue;
+    const group  = String(r[1]||'').trim();
+    const amount = parseFloat(r[6])||0;
+    const disc   = parseFloat(r[7])||0;
+    const {color, size} = parseColorSize(colSize);
+    const base  = stripSize(invName);
+    const brand = getBrand(base);
+    rows.push({group, invName, base, color, size, brand, qty, amount, disc});
   }
-  return map;
+
+  setProgress(50, 'Aggregating by brand & color...');
+
+  // Aggregate: brand → base+color key
+  const brandMap = {};
+  for (const r of rows) {
+    if (!brandMap[r.brand]) brandMap[r.brand] = {};
+    const k = `${r.base}||${r.group}||${r.color}`;
+    if (!brandMap[r.brand][k]) brandMap[r.brand][k] = {
+      base:r.base, group:r.group, brand:r.brand,
+      color:r.color, qty:0, amount:0, sizes:[]
+    };
+    brandMap[r.brand][k].qty    += r.qty;
+    brandMap[r.brand][k].amount += r.amount;
+    if (r.size) brandMap[r.brand][k].sizes.push(r.size);
+  }
+
+  setProgress(70, 'Applying CUTSIZE / FULL SET logic...');
+
+  // Build cumulative size history from Firebase cycles
+  const historySizes = buildHistorySizes();
+
+  const brandTotals = Object.entries(brandMap).map(([brand, items]) => {
+    const isCutsize = brandSettings[brand]==='cutsize';
+
+    const itemArr = Object.values(items).map(item => {
+      const orderKey     = `${item.base}||${item.color||''}||${brand}`;
+      const alreadyOrdered = orderedItems[orderKey] || null;
+
+      // Cumulative sizes: this cycle + all past cycles
+      const thisCycleSizes = new Set(item.sizes);
+      const histSizes      = historySizes[orderKey] || new Set();
+      const allSizes       = new Set([...thisCycleSizes, ...histSizes]);
+      const uniqueSizeCount = allSizes.size;
+
+      let readyToOrder = false;
+      let orderNote    = '';
+      let statusTag    = '';
+
+      if (isCutsize) {
+        readyToOrder = true;
+        orderNote    = `Sizes sold: ${[...thisCycleSizes].sort().join(', ')||'—'}`;
+        statusTag    = '✂ CUTSIZE';
+      } else {
+        // FULL SET: flag when 3+ unique sizes sold across all cycles
+        if (uniqueSizeCount >= 3) {
+          readyToOrder = true;
+          orderNote    = `${uniqueSizeCount} sizes sold across cycles: ${[...allSizes].sort().join(', ')}`;
+          statusTag    = '📦 FULL SET';
+        } else {
+          readyToOrder = false;
+          orderNote    = `${uniqueSizeCount}/3 sizes sold — need ${3-uniqueSizeCount} more`;
+          statusTag    = '⏳ WAITING';
+        }
+      }
+
+      return {
+        ...item,
+        isCutsize, readyToOrder, orderNote, statusTag,
+        allSizes: [...allSizes].sort(),
+        uniqueSizeCount,
+        alreadyOrdered
+      };
+    }).sort((a,b) => (b.readyToOrder - a.readyToOrder) || b.qty - a.qty);
+
+    const totalQty   = itemArr.reduce((s,x)=>s+x.qty, 0);
+    const totalAmt   = itemArr.reduce((s,x)=>s+x.amount, 0);
+    const skuCount   = new Set(itemArr.map(x=>x.base)).size;
+    const readyCount = itemArr.filter(x=>x.readyToOrder && !x.alreadyOrdered).length;
+    return {brand, items:itemArr, totalQty, totalAmt, skuCount, readyCount};
+  }).sort((a,b) => b.readyCount - a.readyCount || b.totalQty - a.totalQty);
+
+  const totalQty   = rows.reduce((s,r)=>s+r.qty, 0);
+  const totalAmt   = rows.reduce((s,r)=>s+r.amount, 0);
+  const totalDisc  = rows.reduce((s,r)=>s+r.disc, 0);
+  const totalReady = brandTotals.reduce((s,b)=>s+b.readyCount, 0);
+
+  parsedData = {rows, brandTotals, totalQty, totalAmt, totalDisc, skuCount:rows.length, totalReady};
+
+  setProgress(85, 'Generating Excel...');
+  const xlsBlob = await generateExcel(parsedData,
+    document.getElementById('cyclePeriod').value,
+    document.getElementById('cycleType').value,
+    brandSettings);
+  setProgress(100, 'Done!');
+
+  renderResults(parsedData, xlsBlob);
+  document.getElementById('progressWrap').style.display = 'none';
+  document.getElementById('processBtn').disabled = false;
 }
 
 // ── SETTINGS ──────────────────────────────────────────────────────────
@@ -877,8 +939,7 @@ function setupDrop(zoneId, handler) {
     const f = e.dataTransfer.files[0]; if (f) handler(f);
   });
 }
-setupDrop('dropZone1', handleSalesFile);
-setupDrop('dropZone2', handleInventoryFile);
+setupDrop('dropZone', handleFile);
 
 // ── FILE HANDLING ──────────────────────────────────────────────────────
 function handleFile(file) {
@@ -894,142 +955,6 @@ function handleFile(file) {
   document.getElementById('cycleMeta').style.display = 'flex';
 }
 
-// ── PARSE & PROCESS ────────────────────────────────────────────────────
-async function processFiles() {
-  if (!salesFile) { toast('Please upload Sales file first','error'); return; }
-  if (!inventoryFile) { toast('Please upload Inventory file first','error'); return; }
-
-  setProgress(5, 'Reading inventory...');
-  document.getElementById('progressWrap').style.display = 'block';
-  document.getElementById('processBtn').disabled = true;
-
-  // Parse inventory first
-  inventoryMap = await parseInventory(inventoryFile);
-  setProgress(20, 'Reading sales...');
-
-  const buf = await salesFile.arrayBuffer();
-  const wb = XLSX.read(buf, {type:'array'});
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-
-  setProgress(35, 'Parsing sales rows...');
-
-  // Find header row
-  let headerRow = -1;
-  for (let i = 0; i < Math.min(raw.length, 10); i++) {
-    const r = raw[i].map(c=>String(c).trim().toLowerCase());
-    if (r.includes('invgroup')||r.includes('inventoryname')||(r.includes('partyname')&&r.includes('qty'))) { headerRow=i; break; }
-  }
-  if (headerRow < 0) headerRow = 5;
-
-  const rows = [];
-  for (let i = headerRow+1; i < raw.length; i++) {
-    const r = raw[i];
-    const invName  = String(r[2]||'').trim();
-    const colorSize= String(r[3]||'').trim();
-    if (!invName || invName==='InventoryName' || invName.toLowerCase().startsWith('total')) continue;
-    const qty = parseFloat(r[5]);
-    if (isNaN(qty)||qty<=0) continue;
-    const group  = String(r[1]||'').trim();
-    const amount = parseFloat(r[6])||0;
-    const disc   = parseFloat(r[7])||0;
-    const {color,size} = parseColorSize(colorSize);
-    const base  = stripSize(invName);
-    const brand = getBrand(base);
-    rows.push({group,invName,base,color,size,brand,qty,amount,disc});
-  }
-
-  setProgress(55, 'Cross-referencing inventory...');
-
-  // Cross-reference: for each sold item, check inventory remaining
-  const brandMap = {};
-  for (const r of rows) {
-    if (!brandMap[r.brand]) brandMap[r.brand] = {};
-    const k = `${r.base}||${r.group}||${r.color}`;
-    if (!brandMap[r.brand][k]) brandMap[r.brand][k] = {
-      base:r.base, group:r.group, brand:r.brand,
-      color:r.color, qty:0, amount:0, sizes:[], invKey:`${r.base}||${r.color}`
-    };
-    brandMap[r.brand][k].qty    += r.qty;
-    brandMap[r.brand][k].amount += r.amount;
-    if (r.size) brandMap[r.brand][k].sizes.push(r.size);
-  }
-
-  setProgress(70, 'Applying order logic...');
-
-  // Apply CUTSIZE / FULLSET logic using inventory
-  const brandTotals = Object.entries(brandMap).map(([brand, items]) => {
-    const itemArr = Object.values(items).map(item => {
-      const isCutsize = brandSettings[brand]==='cutsize';
-      const invData   = inventoryMap[item.invKey] || [];
-
-      // Stock summary for this item+color
-      const inStockSizes  = invData.filter(x=>x.stock>0).map(x=>x.size);
-      const zeroStockSizes = invData.filter(x=>x.stock<=0).map(x=>x.size);
-      const totalSizes    = invData.length;
-
-      let readyToOrder = false;
-      let orderReason  = '';
-      let remainingStock = inStockSizes;
-
-      if (isCutsize) {
-        // CUTSIZE: any size sold → order that size
-        readyToOrder = item.qty > 0;
-        orderReason  = `✂ Order sizes sold: ${[...new Set(item.sizes)].sort().join(', ')||'—'}`;
-      } else {
-        // FULLSET: ready when only 1 size has stock remaining
-        if (totalSizes === 0) {
-          // No inventory data — fall back to sales-based priority
-          readyToOrder = item.qty >= 3;
-          orderReason  = '📦 No inventory data — based on sales qty';
-        } else if (inStockSizes.length <= 1) {
-          readyToOrder = true;
-          orderReason  = inStockSizes.length===0
-            ? '📦 All sizes sold out — order full set'
-            : `📦 Only size ${inStockSizes[0]} remaining — order full set`;
-        } else {
-          readyToOrder = false;
-          orderReason  = `📦 ${inStockSizes.length} sizes still in stock — wait`;
-        }
-      }
-
-      // Check if already ordered this cycle
-      const orderKey = `${item.base}||${item.color}||${brand}`;
-      const alreadyOrdered = orderedItems[orderKey];
-
-      return {
-        ...item,
-        isCutsize, readyToOrder, orderReason,
-        inStockSizes, zeroStockSizes, totalSizes,
-        alreadyOrdered: alreadyOrdered||null
-      };
-    }).sort((a,b)=>(b.readyToOrder-a.readyToOrder)||b.qty-a.qty);
-
-    const totalQty = itemArr.reduce((s,x)=>s+x.qty,0);
-    const totalAmt = itemArr.reduce((s,x)=>s+x.amount,0);
-    const skuCount = new Set(itemArr.map(x=>x.base)).size;
-    const readyCount = itemArr.filter(x=>x.readyToOrder&&!x.alreadyOrdered).length;
-    return {brand, items:itemArr, totalQty, totalAmt, skuCount, readyCount};
-  }).sort((a,b)=>b.readyCount-a.readyCount||b.totalQty-a.totalQty);
-
-  const totalQty  = rows.reduce((s,r)=>s+r.qty,0);
-  const totalAmt  = rows.reduce((s,r)=>s+r.amount,0);
-  const totalDisc = rows.reduce((s,r)=>s+r.disc,0);
-  const totalReady = brandTotals.reduce((s,b)=>s+b.readyCount,0);
-
-  parsedData = {rows,brandTotals,totalQty,totalAmt,totalDisc,skuCount:rows.length,totalReady};
-
-  setProgress(85, 'Generating Excel...');
-  const xlsBlob = await generateExcel(parsedData,
-    document.getElementById('cyclePeriod').value,
-    document.getElementById('cycleType').value,
-    brandSettings);
-  setProgress(100, 'Done!');
-
-  renderResults(parsedData, xlsBlob);
-  document.getElementById('progressWrap').style.display = 'none';
-  document.getElementById('processBtn').disabled = false;
-}
 
 function setProgress(pct, msg) {
   document.getElementById('progressFill').style.width = pct + '%';
@@ -1175,7 +1100,7 @@ async function generateExcel(data, period, cycleType, brandSettings={}) {
 // ── RENDER RESULTS ─────────────────────────────────────────────────────
 function renderResults(data, xlsBlob) {
   const period = document.getElementById('cyclePeriod').value;
-  const url = URL.createObjectURL(xlsBlob);
+  const url    = URL.createObjectURL(xlsBlob);
 
   let html = `<div class="results-wrap">
     <div class="section-title">Cycle Summary</div>
@@ -1189,52 +1114,49 @@ function renderResults(data, xlsBlob) {
     <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
       <a class="download-btn" href="${url}" download="SR_Shoes_Reorder_${period.replace(/ /g,'_')}.xlsx">⬇ Download Excel</a>
       <button class="save-btn" id="saveBtn" onclick="saveCycle(this)">💾 Save to History</button>
+    </div>
+    <div style="font-size:12px;color:var(--muted2);font-family:var(--font-mono);margin-bottom:20px">
+      Save to history after downloading so next cycle's FULL SET tracking is accurate.
     </div>`;
 
-  // ── Order Checklist ──
-  html += `<div class="section-title" style="margin-top:24px">✅ Order Checklist — tick when ordered</div>
-    <div class="checklist-wrap" id="orderChecklist">`;
+  // ── Checklist ──
+  html += `<div class="section-title">✅ Order Checklist — tick when ordered</div>
+    <div class="checklist-wrap">`;
 
   for (const bt of data.brandTotals) {
-    const readyItems = bt.items.filter(x=>x.readyToOrder && !x.alreadyOrdered);
-    const waitItems  = bt.items.filter(x=>!x.readyToOrder && !x.alreadyOrdered);
-    const doneItems  = bt.items.filter(x=>x.alreadyOrdered);
     if (!bt.items.length) continue;
+    const readyItems   = bt.items.filter(x => x.readyToOrder && !x.alreadyOrdered);
+    const waitingItems = bt.items.filter(x => !x.readyToOrder && !x.alreadyOrdered);
+    const doneItems    = bt.items.filter(x => x.alreadyOrdered);
 
     html += `<div class="checklist-brand-header">
-      <span>🏷 ${bt.brand} — ${bt.totalQty} pairs sold</span>
+      <span>🏷 ${bt.brand} — ${bt.totalQty} pairs sold this cycle</span>
       <span style="font-size:11px;color:${bt.readyCount>0?'var(--low)':'var(--muted2)'}">
-        ${bt.readyCount} ready to order
+        ${bt.readyCount > 0 ? bt.readyCount+' ready to order' : 'none ready'}
       </span>
     </div>`;
 
-    // Ready to order items first
+    // Ready items
     for (const item of readyItems) {
-      const orderKey = `${item.base}||${item.color}||${bt.brand}`;
-      const sizes = [...new Set(item.sizes)].sort().join(', ')||'—';
-      const stockInfo = item.inStockSizes.length>0
-        ? `Stock left: ${item.inStockSizes.join(', ')}`
-        : 'All sizes sold';
-      html += `<div class="checklist-item" id="ci-${btoa(orderKey).replace(/=/g,'')}">
-        <input type="checkbox" onchange="markOrdered(this,'${orderKey.replace(/'/g,"\\'")}')"/>
+      const orderKey = `${item.base}||${item.color||''}||${bt.brand}`;
+      const safeKey  = orderKey.replace(/[^a-zA-Z0-9]/g,'_');
+      html += `<div class="checklist-item" id="ci-${safeKey}">
+        <input type="checkbox" onchange="markOrdered(this,'${orderKey.replace(/'/g,"\\'")}','${safeKey}')"/>
         <div class="checklist-item-name">${item.base}</div>
         <span class="checklist-item-color">${item.color||'—'}</span>
-        <span class="checklist-item-sizes">Sold: ${sizes}</span>
-        <span class="checklist-item-stock">${stockInfo}</span>
-        <span class="checklist-item-ready ${item.isCutsize?'ready-cutsize':'ready-fullset'}">${item.isCutsize?'✂ CUTSIZE':'📦 FULL SET'}</span>
+        <span class="checklist-item-sizes">${item.orderNote}</span>
+        <span class="checklist-item-ready ${item.isCutsize?'ready-cutsize':'ready-fullset'}">${item.statusTag}</span>
       </div>`;
     }
 
-    // Waiting items (not ready yet)
-    for (const item of waitItems) {
-      const sizes = [...new Set(item.sizes)].sort().join(', ')||'—';
-      html += `<div class="checklist-item" style="opacity:.5">
+    // Waiting items (grayed out, not ready yet)
+    for (const item of waitingItems) {
+      html += `<div class="checklist-item" style="opacity:.45">
         <input type="checkbox" disabled/>
         <div class="checklist-item-name">${item.base}</div>
         <span class="checklist-item-color">${item.color||'—'}</span>
-        <span class="checklist-item-sizes">Sold: ${sizes}</span>
-        <span class="checklist-item-stock">${item.inStockSizes.length} sizes in stock</span>
-        <span class="checklist-item-ready ready-waiting">⏳ WAITING</span>
+        <span class="checklist-item-sizes">${item.orderNote}</span>
+        <span class="checklist-item-ready ready-waiting">${item.statusTag}</span>
       </div>`;
     }
 
@@ -1244,14 +1166,14 @@ function renderResults(data, xlsBlob) {
         <input type="checkbox" checked disabled/>
         <div class="checklist-item-name" style="text-decoration:line-through;color:var(--muted)">${item.base}</div>
         <span class="checklist-item-color">${item.color||'—'}</span>
-        <span style="font-size:11px;color:var(--low);font-family:var(--font-mono)">Ordered ${item.alreadyOrdered.orderedAt}</span>
+        <span style="font-size:11px;color:var(--low);font-family:var(--font-mono)">Ordered on ${item.alreadyOrdered.orderedAt}</span>
       </div>`;
     }
   }
 
-  html += `</div></div>`; // close checklist-wrap + results-wrap
+  html += `</div></div>`;
   document.getElementById('resultsArea').innerHTML = html;
-  window._lastBlob = xlsBlob;
+  window._lastBlob  = xlsBlob;
   window._lastPeriod = period;
 }
 
@@ -1281,10 +1203,11 @@ async function saveCycle(btn) {
       skuCount: bt.items.length,
       items: bt.items.map(it=>({
         base: it.base,
+        color: it.color||'',
         group: it.group,
         qty: it.qty,
         amount: it.amount,
-        sizes: it.sizes
+        sizes: [...new Set(it.sizes)]  // store unique sizes for full set tracking
       }))
     }))
   };
@@ -1305,19 +1228,19 @@ async function saveCycle(btn) {
 }
 
 // ── ORDER TRACKING ─────────────────────────────────────────────────────
-function markOrdered(checkbox, orderKey) {
+function markOrdered(checkbox, orderKey, safeKey) {
   const row = checkbox.closest('.checklist-item');
   if (checkbox.checked) {
     row.classList.add('ordered');
+    row.style.opacity = '0.65';
     orderedItems[orderKey] = {
       orderedAt: new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}),
       cycleId: document.getElementById('cyclePeriod').value
     };
-    // Visual feedback
-    checkbox.closest('.checklist-item').style.opacity = '0.7';
     toast('Marked as ordered ✓','success');
   } else {
     row.classList.remove('ordered');
+    row.style.opacity = '1';
     delete orderedItems[orderKey];
   }
 }
