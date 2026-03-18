@@ -16,7 +16,7 @@
 <!-- Firebase -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
-import { getFirestore, collection, addDoc, getDocs, orderBy, query, setDoc, doc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+import { getFirestore, collection, addDoc, getDocs, orderBy, query, setDoc, doc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBm7cmZKWBZTUUaof-2vv20E513vH4sRi8",
@@ -48,6 +48,7 @@ window._fbOrderBy = orderBy;
 window._fbQuery = query;
 window._fbSetDoc = setDoc;
 window._fbDoc = doc;
+window._fbDeleteDoc = deleteDoc;
 window._firebaseReady = true;
 window.dispatchEvent(new Event('firebaseReady'));
 </script>
@@ -515,6 +516,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-hei
       <div style="margin-top:12px;font-size:12px;color:var(--muted2);font-family:var(--font-mono)">
         Settings are saved to Firebase and applied automatically every cycle.
       </div>
+
+      <!-- Danger Zone -->
+      <div style="margin-top:32px;border:1px solid rgba(239,68,68,.3);border-radius:var(--radius);padding:20px">
+        <div style="font-family:var(--font-head);font-size:13px;font-weight:700;color:var(--high);margin-bottom:8px">⚠ Danger Zone</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+          Deletes all saved cycles, brand settings and history from Firebase. Use only during testing.
+        </div>
+        <button onclick="masterReset()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.4);color:var(--high);font-family:var(--font-head);font-size:13px;font-weight:700;padding:9px 20px;border-radius:6px;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(239,68,68,.2)'" onmouseout="this.style.background='rgba(239,68,68,.1)'">
+          🗑 Master Reset — Clear All Data
+        </button>
+      </div>
       <div id="settingsError" style="display:none;margin-top:14px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:var(--radius-sm);padding:16px 20px">
         <div style="color:#ef4444;font-weight:700;font-size:13px;margin-bottom:8px">⚠ Firestore Permission Error</div>
         <div style="color:var(--muted);font-size:12px;line-height:1.7">
@@ -868,6 +880,57 @@ async function saveSettings() {
   }
 }
 
+async function masterReset() {
+  const confirmed = window.confirm('⚠ This will permanently delete ALL saved cycles, brand settings and history from Firebase.\n\nAre you sure? This cannot be undone.');
+  if (!confirmed) return;
+
+  const confirmed2 = window.confirm('Final confirmation — DELETE EVERYTHING?');
+  if (!confirmed2) return;
+
+  if (!window._firebaseReady) { toast('Firebase not ready','error'); return; }
+
+  toast('Deleting all data...', 'error');
+  const db = window._db;
+  let deleted = 0;
+
+  try {
+    // Delete all cycles
+    const cycleSnap = await window._fbGetDocs(window._fbCollection(db,'srshoes_reorder_cycles'));
+    for (const d of cycleSnap.docs) {
+      await window._fbDeleteDoc(window._fbDoc(db,'srshoes_reorder_cycles', d.id));
+      deleted++;
+    }
+    // Delete all brand settings
+    const settingsSnap = await window._fbGetDocs(window._fbCollection(db,'srshoes_brand_settings'));
+    for (const d of settingsSnap.docs) {
+      await window._fbDeleteDoc(window._fbDoc(db,'srshoes_brand_settings', d.id));
+      deleted++;
+    }
+
+    // Reset local state
+    cycles        = [];
+    brandSettings = {};
+    orderedItems  = {};
+    parsedData    = null;
+    currentFile   = null;
+
+    // Reset UI
+    document.getElementById('resultsArea').innerHTML = '';
+    document.getElementById('cycleMeta').style.display = 'none';
+    document.getElementById('dateRangeHint').style.display = 'none';
+    const dz = document.getElementById('dropZone');
+    dz.querySelector('.upload-title').textContent = 'Drop your Party-wise Summary XLS';
+    dz.querySelector('.upload-hint').textContent = 'Reports → Party-wise Summary → All Parties → Export XLS\nSupports .xls and .xlsx  |  Color data included automatically';
+    dz.style.borderColor = '';
+    renderSettings();
+
+    toast(`✓ Reset complete — ${deleted} records deleted`, 'success');
+  } catch(e) {
+    console.error('masterReset error:', e);
+    toast(`Reset failed: ${e.message||e}`, 'error');
+  }
+}
+
 function renderSettings() {
   const brands = BRAND_RULES.map(([b])=>b).filter(b=>b!=='Other');
   const list=document.getElementById('settingsBrandList');
@@ -1117,9 +1180,12 @@ function renderResults(data, xlsBlob) {
 
     html += `<div class="checklist-brand-header">
       <span>🏷 ${bt.brand} — ${bt.totalQty} pairs sold this cycle</span>
-      <span style="font-size:11px;color:${bt.readyCount>0?'var(--low)':'var(--muted2)'}">
-        ${bt.readyCount > 0 ? bt.readyCount+' ready to order' : 'none ready'}
-      </span>
+      <div style="display:flex;align-items:center;gap:10px">
+        ${bt.readyCount > 0 ? `<button onclick="markAllOrdered('${bt.brand.replace(/'/g,"\\'")}',this)" style="background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:var(--low);font-size:11px;font-family:var(--font-mono);font-weight:700;padding:3px 10px;border-radius:5px;cursor:pointer">✓ Mark All</button>` : ''}
+        <span style="font-size:11px;color:${bt.readyCount>0?'var(--low)':'var(--muted2)'}">
+          ${bt.readyCount > 0 ? bt.readyCount+' ready to order' : 'none ready'}
+        </span>
+      </div>
     </div>`;
 
     // Ready items
@@ -1229,6 +1295,22 @@ function markOrdered(checkbox, orderKey, safeKey) {
     row.style.opacity = '1';
     delete orderedItems[orderKey];
   }
+}
+
+function markAllOrdered(brand, btn) {
+  // Find all enabled (ready) checkboxes under this brand header
+  const header = btn.closest('.checklist-brand-header');
+  let sibling  = header.nextElementSibling;
+  let count    = 0;
+  while (sibling && !sibling.classList.contains('checklist-brand-header')) {
+    const cb = sibling.querySelector('input[type=checkbox]:not(:disabled):not(:checked)');
+    if (cb) { cb.checked = true; cb.dispatchEvent(new Event('change')); count++; }
+    sibling = sibling.nextElementSibling;
+  }
+  btn.textContent = '✓ All Marked';
+  btn.style.opacity = '0.5';
+  btn.disabled = true;
+  if (count > 0) toast(`${brand}: ${count} items marked as ordered ✓`, 'success');
 }
 
 async function loadCycles() {
